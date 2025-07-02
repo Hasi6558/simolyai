@@ -81,6 +81,13 @@ import {
 } from 'lucide-react';
 
 // Definire i tipi per i campi del form
+interface FormFieldOption {
+  id: string;
+  value: string;
+  score?: number;
+  image?: string; // Allow image for image-choice options
+}
+
 interface FormField {
   id: string;
   type: string;
@@ -88,7 +95,7 @@ interface FormField {
   placeholder?: string;
   required: boolean;
   helpText?: string;
-  options?: { id: string; value: string }[];
+  options?: FormFieldOption[];
   defaultValue?: string | string[];
   validation?: {
     min?: number;
@@ -96,6 +103,15 @@ interface FormField {
     pattern?: string;
   };
   properties?: Record<string, any>;
+  image?: string;
+  guide?: string;
+  lesson?: string;
+  logic?: {
+    enabled: boolean;
+    sourceFieldId: string;
+    condition: string;
+    value: string;
+  };
 }
 
 interface FormPage {
@@ -361,12 +377,12 @@ const FormBuilderEditor = () => {
       type: fieldType,
       label: getDefaultLabelForType(fieldType),
     };
-    
-    // Aggiungi proprietà specifiche in base al tipo
-    if (fieldType === 'radio' || fieldType === 'checkbox' || fieldType === 'select') {
+
+    // Type-specific defaults
+    if (["radio", "checkbox", "select"].includes(fieldType)) {
       newField.options = [
-        { id: `option-${Date.now()}-1`, value: 'Opzione 1' },
-        { id: `option-${Date.now()}-2`, value: 'Opzione 2' },
+        { id: `option-${Date.now()}-1`, value: 'Opzione 1', score: 0 },
+        { id: `option-${Date.now()}-2`, value: 'Opzione 2', score: 0 },
       ];
     } else if (fieldType === 'scale') {
       newField.properties = {
@@ -375,8 +391,28 @@ const FormBuilderEditor = () => {
         minLabel: 'Min',
         maxLabel: 'Max',
       };
+    } else if (fieldType === 'file') {
+      newField.properties = {
+        accept: '',
+        maxSizeMB: 5,
+        multiple: false,
+      };
+    } else if (fieldType === 'image-choice') {
+      newField.options = [
+        { id: `option-${Date.now()}-1`, value: '', score: 0, image: '' },
+        { id: `option-${Date.now()}-2`, value: '', score: 0, image: '' },
+      ];
+    } else if (fieldType === 'rating') {
+      newField.properties = {
+        maxStars: 5,
+      };
+    } else if (fieldType === 'number' || fieldType === 'range') {
+      newField.validation = {
+        min: 0,
+        max: 100,
+      };
     }
-    
+
     setForm(prev => {
       const updatedPages = [...prev.pages];
       updatedPages[pageIndex] = {
@@ -388,7 +424,7 @@ const FormBuilderEditor = () => {
         pages: updatedPages,
       };
     });
-    
+
     // Seleziona il nuovo campo
     setTimeout(() => {
       setSelectedField({
@@ -803,11 +839,76 @@ const FormBuilderEditor = () => {
   }
 
   const FormFieldEditor = ({ field, pageIndex, fieldIndex }: { field: FormField, pageIndex: number, fieldIndex: number }) => {
+    // Image upload state
+    const [imageUrl, setImageUrl] = useState(field.image || '');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+
+    // Conditional logic state (inline, per field)
+    const [showLogic, setShowLogic] = useState(false);
+    const [logic, setLogic] = useState(field.logic || {
+      enabled: false,
+      sourceFieldId: '',
+      condition: 'equals',
+      value: ''
+    });
+
+    // Handle image file upload
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setImageUrl(ev.target?.result as string);
+          handleFieldChange(pageIndex, fieldIndex, 'image', ev.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    // Remove image
+    const handleRemoveImage = () => {
+      setImageFile(null);
+      setImageUrl('');
+      handleFieldChange(pageIndex, fieldIndex, 'image', '');
+    };
+
+    // Handle guide/lesson
+    const handleGuideChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      handleFieldChange(pageIndex, fieldIndex, 'guide', e.target.value);
+    };
+    const handleLessonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      handleFieldChange(pageIndex, fieldIndex, 'lesson', e.target.value);
+    };
+
+    // Handle option score
+    const handleOptionScoreChange = (optIndex: number, score: number) => {
+      const options = field.options ? [...field.options] : [];
+      options[optIndex] = { ...options[optIndex], score };
+      handleFieldChange(pageIndex, fieldIndex, 'options', options);
+    };
+
+    // Handle logic changes
+    const handleLogicChange = (key: string, value: any) => {
+      const newLogic = { ...logic, [key]: value };
+      setLogic(newLogic);
+      handleFieldChange(pageIndex, fieldIndex, 'logic', newLogic);
+    };
+
+    // Get other fields for logic
+    const otherFields = form.pages.flatMap((p, pi) =>
+      p.fields.map((f, fi) => ({
+        id: f.id,
+        label: f.label || `Domanda ${fi + 1}`,
+        pageIndex: pi
+      }))
+    ).filter(f => f.id !== field.id);
+
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor={`field-${field.id}-label`}>Etichetta</Label>
+            <Label htmlFor={`field-${field.id}-label`}>Descrizione (testo della domanda)</Label>
             <Input
               id={`field-${field.id}-label`}
               value={field.label}
@@ -843,6 +944,54 @@ const FormBuilderEditor = () => {
           </div>
         </div>
         
+        {/* Image upload/preview */}
+        <div className="space-y-2">
+          <Label>Immagine (opzionale)</Label>
+          {imageUrl && (
+            <div className="mb-2 flex items-center gap-4">
+              <img src={imageUrl} alt="Preview" className="h-20 rounded border" />
+              <Button variant="ghost" size="sm" onClick={handleRemoveImage}>Rimuovi</Button>
+            </div>
+          )}
+          <Input type="file" accept="image/*" onChange={handleImageChange} />
+          <Input
+            type="url"
+            placeholder="Incolla un URL di immagine"
+            value={imageUrl.startsWith('data:') ? '' : imageUrl}
+            onChange={e => {
+              setImageUrl(e.target.value);
+              handleFieldChange(pageIndex, fieldIndex, 'image', e.target.value);
+            }}
+          />
+        </div>
+        
+        {/* Guide and Lesson */}
+        <div className="space-y-2">
+          <Label>Guida (testo di aiuto, mostrato con icona "?" accanto alla domanda)</Label>
+          <Textarea
+            value={field.guide || ''}
+            onChange={handleGuideChange}
+            placeholder="Testo di guida per questa domanda"
+            rows={2}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Questo testo verrà mostrato come aiuto quando l'utente clicca o passa sopra l'icona "?" accanto alla domanda.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Lezione (nota o approfondimento, mostrato al passaggio del mouse sulla domanda)</Label>
+          <Textarea
+            value={field.lesson || ''}
+            onChange={handleLessonChange}
+            placeholder="Testo di lezione o approfondimento"
+            rows={2}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Questo testo apparirà in un pannello a destra quando l'utente passa il mouse sulla domanda.
+          </p>
+        </div>
+        
+        {/* Placeholder for text fields */}
         {['text', 'textarea', 'email', 'number', 'tel', 'date', 'time'].includes(field.type) && (
           <div className="space-y-2">
             <Label htmlFor={`field-${field.id}-placeholder`}>Placeholder</Label>
@@ -854,8 +1003,9 @@ const FormBuilderEditor = () => {
           </div>
         )}
         
+        {/* Help text */}
         <div className="space-y-2">
-          <Label htmlFor={`field-${field.id}-help`}>Testo di aiuto</Label>
+          <Label htmlFor={`field-${field.id}-help`}>Testo di aiuto (sotto la domanda)</Label>
           <Input
             id={`field-${field.id}-help`}
             value={field.helpText || ''}
@@ -864,6 +1014,7 @@ const FormBuilderEditor = () => {
           />
         </div>
         
+        {/* Required switch */}
         <div className="flex items-center space-x-2">
           <Switch
             id={`field-${field.id}-required`}
@@ -873,6 +1024,7 @@ const FormBuilderEditor = () => {
           <Label htmlFor={`field-${field.id}-required`}>Campo obbligatorio</Label>
         </div>
         
+        {/* Answer choices with scores */}
         {['radio', 'checkbox', 'select'].includes(field.type) && field.options && (
           <div className="space-y-2">
             <div className="flex justify-between items-center">
@@ -893,6 +1045,13 @@ const FormBuilderEditor = () => {
                     onChange={(e) => updateOption(pageIndex, fieldIndex, optIndex, e.target.value)}
                     placeholder={`Opzione ${optIndex + 1}`}
                   />
+                  <Input
+                    type="number"
+                    className="w-24"
+                    value={option.score ?? ''}
+                    onChange={e => handleOptionScoreChange(optIndex, Number(e.target.value))}
+                    placeholder="Punteggio"
+                  />
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -907,6 +1066,7 @@ const FormBuilderEditor = () => {
           </div>
         )}
         
+        {/* Scale field properties */}
         {field.type === 'scale' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -961,6 +1121,55 @@ const FormBuilderEditor = () => {
             </div>
           </div>
         )}
+        
+        {/* Inline conditional logic */}
+        <div className="space-y-2 border-t pt-4 mt-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={logic.enabled}
+              onCheckedChange={checked => handleLogicChange('enabled', checked)}
+              id={`logic-enabled-${field.id}`}
+            />
+            <Label htmlFor={`logic-enabled-${field.id}`}>Mostra questa domanda solo se...</Label>
+            <Button variant="ghost" size="sm" onClick={() => setShowLogic(v => !v)}>
+              {showLogic ? 'Nascondi' : 'Configura'}
+            </Button>
+          </div>
+          {logic.enabled && showLogic && (
+            <div className="p-3 border rounded-md bg-muted">
+              <div className="flex flex-col md:flex-row gap-2 md:items-center">
+                <Label>Domanda di riferimento</Label>
+                <select
+                  className="border rounded px-2 py-1"
+                  value={logic.sourceFieldId}
+                  onChange={e => handleLogicChange('sourceFieldId', e.target.value)}
+                >
+                  <option value="">Seleziona domanda...</option>
+                  {otherFields.map(f => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+                <select
+                  className="border rounded px-2 py-1"
+                  value={logic.condition}
+                  onChange={e => handleLogicChange('condition', e.target.value)}
+                >
+                  <option value="equals">uguale a</option>
+                  <option value="not_equals">diverso da</option>
+                  <option value="greater">maggiore di</option>
+                  <option value="less">minore di</option>
+                  <option value="contains">contiene</option>
+                </select>
+                <Input
+                  className="w-32"
+                  value={logic.value}
+                  onChange={e => handleLogicChange('value', e.target.value)}
+                  placeholder="Valore"
+                />
+              </div>
+            </div>
+          )}
+        </div>
         
         <div className="flex justify-between pt-4">
           <div>
