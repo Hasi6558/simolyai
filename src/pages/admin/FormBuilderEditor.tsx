@@ -161,7 +161,6 @@ const FormBuilderEditor = () => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('editor');
   const [activePage, setActivePage] = useState<number>(0);
-  const [fieldMenuOpen, setFieldMenuOpen] = useState(false);
   const [selectedField, setSelectedField] = useState<{ pageIndex: number; fieldIndex: number } | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
 
@@ -397,8 +396,6 @@ const FormBuilderEditor = () => {
         fieldIndex: form.pages[pageIndex].fields.length,
       });
     }, 10);
-    
-    setFieldMenuOpen(false);
   };
 
   const deleteField = (pageIndex: number, fieldIndex: number) => {
@@ -567,9 +564,50 @@ const FormBuilderEditor = () => {
 
   const handleDragEnd = (result: any) => {
     const { source, destination, type } = result;
-    
     if (!destination) return;
-    
+
+    // Drag from sidebar to fields list
+    if (source.droppableId === 'field-types' && destination.droppableId.startsWith('fields-')) {
+      const pageIndex = parseInt(destination.droppableId.split('-')[1]);
+      const fieldType = result.draggableId.replace('sidebar-', '');
+      const newFieldId = `field-${Date.now()}`;
+      let newField = {
+        ...defaultField,
+        id: newFieldId,
+        type: fieldType,
+        label: getDefaultLabelForType(fieldType),
+      };
+      // Add options for certain types
+      if (["radio", "checkbox", "select"].includes(fieldType)) {
+        newField.options = [
+          { id: `option-${Date.now()}-1`, value: 'Opzione 1' },
+          { id: `option-${Date.now()}-2`, value: 'Opzione 2' },
+        ];
+      } else if (fieldType === 'scale') {
+        newField.properties = {
+          min: 1,
+          max: 5,
+          minLabel: 'Min',
+          maxLabel: 'Max',
+        };
+      }
+      setForm(prev => {
+        const updatedPages = [...prev.pages];
+        const fields = Array.from(updatedPages[pageIndex].fields);
+        fields.splice(destination.index, 0, newField);
+        updatedPages[pageIndex] = {
+          ...updatedPages[pageIndex],
+          fields,
+        };
+        return {
+          ...prev,
+          pages: updatedPages,
+        };
+      });
+      return;
+    }
+
+    // Existing reorder logic for fields
     if (type === 'page') {
       // Riordinamento pagine
       const newPages = Array.from(form.pages);
@@ -1051,6 +1089,45 @@ const FormBuilderEditor = () => {
     );
   };
 
+  // Define fieldTypes array for sidebar
+  const fieldTypes = [
+    { type: 'text', label: 'Campo di Testo' },
+    { type: 'textarea', label: 'Area di Testo' },
+    { type: 'email', label: 'Email' },
+    { type: 'number', label: 'Numero' },
+    { type: 'tel', label: 'Telefono' },
+    { type: 'radio', label: 'Scelta Singola' },
+    { type: 'checkbox', label: 'Scelta Multipla' },
+    { type: 'select', label: 'Menu a Tendina' },
+    { type: 'date', label: 'Data' },
+    { type: 'time', label: 'Ora' },
+    { type: 'scale', label: 'Scala di Valutazione' },
+    { type: 'rating', label: 'Valutazione a Stelle' },
+    { type: 'file', label: 'Caricamento File' },
+    { type: 'image-choice', label: 'Scelta Immagine' },
+    { type: 'name', label: 'Nome' },
+    { type: 'address', label: 'Indirizzo' },
+  ];
+
+  // Handler for drag start from sidebar
+  const handleSidebarDragStart = (e, type) => {
+    e.dataTransfer.setData('fieldType', type);
+  };
+
+  // Handler for drop on fields list
+  const handleFieldsDrop = (e, pageIndex) => {
+    e.preventDefault();
+    const fieldType = e.dataTransfer.getData('fieldType');
+    if (fieldType) {
+      addNewField(pageIndex, fieldType);
+    }
+  };
+
+  // Handler for drag over fields list
+  const handleFieldsDragOver = (e) => {
+    e.preventDefault();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -1120,56 +1197,57 @@ const FormBuilderEditor = () => {
         </div>
       ) : (
         // Modalità modifica
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="editor">Editor</TabsTrigger>
-            <TabsTrigger value="settings">Impostazioni</TabsTrigger>
-            <TabsTrigger value="logic">Logica</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="editor" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Informazioni Base</CardTitle>
-                <CardDescription>
-                  Informazioni generali sul form
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="form-title">Titolo</Label>
-                    <Input
-                      id="form-title"
-                      value={form.title}
-                      onChange={(e) => handleFormChange('title', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="form-description">Descrizione</Label>
-                    <Textarea
-                      id="form-description"
-                      value={form.description}
-                      onChange={(e) => handleFormChange('description', e.target.value)}
-                      placeholder="Descrizione opzionale del form"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="editor">Editor</TabsTrigger>
+              <TabsTrigger value="settings">Impostazioni</TabsTrigger>
+              <TabsTrigger value="logic">Logica</TabsTrigger>
+            </TabsList>
             
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <div className="lg:col-span-1">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Pagine</CardTitle>
-                    <CardDescription>
-                      Organizza il form in pagine
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <DragDropContext onDragEnd={handleDragEnd}>
+            <TabsContent value="editor" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Informazioni Base</CardTitle>
+                  <CardDescription>
+                    Informazioni generali sul form
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="form-title">Titolo</Label>
+                      <Input
+                        id="form-title"
+                        value={form.title}
+                        onChange={(e) => handleFormChange('title', e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="form-description">Descrizione</Label>
+                      <Textarea
+                        id="form-description"
+                        value={form.description}
+                        onChange={(e) => handleFormChange('description', e.target.value)}
+                        placeholder="Descrizione opzionale del form"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Pages and Fields Editor */}
+                <div className="lg:col-span-1">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Pagine</CardTitle>
+                      <CardDescription>
+                        Organizza il form in pagine
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
                       <Droppable droppableId="pages" type="page">
                         {(provided) => (
                           <div
@@ -1221,386 +1299,269 @@ const FormBuilderEditor = () => {
                           </div>
                         )}
                       </Droppable>
-                    </DragDropContext>
-                    
-                    <Button
-                      variant="outline"
-                      className="w-full mt-4"
-                      onClick={addNewPage}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Aggiungi Pagina
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              <div className="lg:col-span-3">
-                <Card>
-                  <CardHeader>
-                    <div className="flex justify-between">
-                      <div>
-                        <CardTitle>
-                          Editor Pagina: {form.pages[activePage]?.title || ''}
-                        </CardTitle>
-                        <CardDescription>
-                          Modifica i dettagli e i campi della pagina corrente
-                        </CardDescription>
-                      </div>
-                      <Dialog open={fieldMenuOpen} onOpenChange={setFieldMenuOpen}>
-                        <DialogTrigger asChild>
-                          <Button>
-                            <Plus className="h-4 w-4 mr-1" /> Aggiungi Campo
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Aggiungi un nuovo campo</DialogTitle>
-                            <DialogDescription>
-                              Seleziona il tipo di campo da aggiungere al form
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'text')}
-                            >
-                              <FileText className="h-5 w-5 mr-2" /> Campo di Testo
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'textarea')}
-                            >
-                              <MessageSquare className="h-5 w-5 mr-2" /> Area di Testo
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'email')}
-                            >
-                              <Mail className="h-5 w-5 mr-2" /> Email
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'number')}
-                            >
-                              <ListTodo className="h-5 w-5 mr-2" /> Numero
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'radio')}
-                            >
-                              <Circle className="h-5 w-5 mr-2" /> Scelta Singola
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'checkbox')}
-                            >
-                              <CheckSquare className="h-5 w-5 mr-2" /> Scelta Multipla
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'select')}
-                            >
-                              <ListTodo className="h-5 w-5 mr-2" /> Menu a Tendina
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'date')}
-                            >
-                              <Calendar className="h-5 w-5 mr-2" /> Data
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'time')}
-                            >
-                              <Clock className="h-5 w-5 mr-2" /> Ora
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'scale')}
-                            >
-                              <Layers className="h-5 w-5 mr-2" /> Scala
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'rating')}
-                            >
-                              <Star className="h-5 w-5 mr-2" /> Valutazione
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="justify-start h-auto py-3"
-                              onClick={() => addNewField(activePage, 'name')}
-                            >
-                              <User className="h-5 w-5 mr-2" /> Nome
-                            </Button>
-                          </div>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => setFieldMenuOpen(false)}>
-                              Annulla
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Page Properties */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="page-title">Titolo della Pagina</Label>
-                          <Input
-                            id="page-title"
-                            value={form.pages[activePage]?.title || ''}
-                            onChange={(e) => handlePageChange(activePage, 'title', e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="page-description">Descrizione della Pagina</Label>
-                          <Textarea
-                            id="page-description"
-                            value={form.pages[activePage]?.description || ''}
-                            onChange={(e) => handlePageChange(activePage, 'description', e.target.value)}
-                            placeholder="Descrizione opzionale della pagina"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    {/* Fields List */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Campi</h3>
-                      
-                      <DragDropContext onDragEnd={handleDragEnd}>
-                        <Droppable droppableId={`fields-${activePage}`} type="field">
-                          {(provided) => (
-                            <div
-                              {...provided.droppableProps}
-                              ref={provided.innerRef}
-                              className="space-y-4"
-                            >
-                              {form.pages[activePage]?.fields.map((field, fieldIndex) => (
-                                <Draggable
-                                  key={field.id}
-                                  draggableId={field.id}
-                                  index={fieldIndex}
-                                >
-                                  {(provided) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                    >
-                                      <Card>
-                                        <CardHeader className="pb-2 pt-4 px-4">
-                                          <div className="flex justify-between items-center">
-                                            <div className="flex items-center">
-                                              <div
-                                                {...provided.dragHandleProps}
-                                                className="mr-2 cursor-grab"
-                                              >
-                                                <GripVertical size={16} />
-                                              </div>
-                                              <div className="flex items-center">
-                                                {getFieldIcon(field.type)}
-                                                <span className="ml-2 font-medium">{field.label}</span>
-                                              </div>
-                                            </div>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
-                                                if (selectedField && 
-                                                    selectedField.pageIndex === activePage && 
-                                                    selectedField.fieldIndex === fieldIndex) {
-                                                  setSelectedField(null);
-                                                } else {
-                                                  setSelectedField({
-                                                    pageIndex: activePage,
-                                                    fieldIndex,
-                                                  });
-                                                }
-                                              }}
-                                            >
-                                              {selectedField && 
-                                               selectedField.pageIndex === activePage && 
-                                               selectedField.fieldIndex === fieldIndex ? 
-                                                'Chiudi' : 'Modifica'}
-                                            </Button>
-                                          </div>
-                                        </CardHeader>
-                                        {selectedField && 
-                                         selectedField.pageIndex === activePage && 
-                                         selectedField.fieldIndex === fieldIndex && (
-                                          <CardContent className="px-4 pb-4">
-                                            <FormFieldEditor
-                                              field={field}
-                                              pageIndex={activePage}
-                                              fieldIndex={fieldIndex}
-                                            />
-                                          </CardContent>
-                                        )}
-                                      </Card>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      </DragDropContext>
-                      
-                      {form.pages[activePage]?.fields.length === 0 && (
-                        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-md">
-                          <p className="text-muted-foreground mb-4">
-                            Nessun campo in questa pagina
-                          </p>
-                          <Button onClick={() => setFieldMenuOpen(true)}>
-                            <Plus className="h-4 w-4 mr-1" /> Aggiungi Campo
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Impostazioni Form</CardTitle>
-                <CardDescription>
-                  Personalizza le impostazioni del form
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Aspetto</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="theme">Tema</Label>
-                      <Select
-                        value={form.settings.themeName}
-                        onValueChange={(value) => handleSettingChange('themeName', value)}
+                      <Button
+                        variant="outline"
+                        className="w-full mt-4"
+                        onClick={addNewPage}
                       >
-                        <SelectTrigger id="theme">
-                          <SelectValue placeholder="Seleziona tema" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default</SelectItem>
-                          <SelectItem value="modern">Modern</SelectItem>
-                          <SelectItem value="classic">Classic</SelectItem>
-                          <SelectItem value="minimal">Minimal</SelectItem>
-                          <SelectItem value="corporate">Corporate</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Plus className="h-4 w-4 mr-1" /> Aggiungi Pagina
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="lg:col-span-3">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex justify-between">
+                        <div>
+                          <CardTitle>
+                            Editor Pagina: {form.pages[activePage]?.title || ''}
+                          </CardTitle>
+                          <CardDescription>
+                            Modifica i dettagli e i campi della pagina corrente
+                          </CardDescription>
+                        </div>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-1" /> Aggiungi Campo
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Page Properties */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="page-title">Titolo della Pagina</Label>
+                            <Input
+                              id="page-title"
+                              value={form.pages[activePage]?.title || ''}
+                              onChange={(e) => handlePageChange(activePage, 'title', e.target.value)}
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="page-description">Descrizione della Pagina</Label>
+                            <Textarea
+                              id="page-description"
+                              value={form.pages[activePage]?.description || ''}
+                              onChange={(e) => handlePageChange(activePage, 'description', e.target.value)}
+                              placeholder="Descrizione opzionale della pagina"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Separator />
+                      
+                      {/* Fields List */}
+                      <div
+                        className="space-y-4 min-h-[100px] border-2 border-dashed rounded-md p-4"
+                        onDragOver={handleFieldsDragOver}
+                        onDrop={(e) => handleFieldsDrop(e, activePage)}
+                      >
+                        {form.pages[activePage]?.fields.map((field, fieldIndex) => (
+                          <Card key={field.id}>
+                            <CardHeader className="pb-2 pt-4 px-4">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center">
+                                  <GripVertical className="mr-2 text-gray-400" />
+                                  <div className="flex items-center">
+                                    {getFieldIcon(field.type)}
+                                    <span className="ml-2 font-medium">{field.label}</span>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (selectedField && 
+                                        selectedField.pageIndex === activePage && 
+                                        selectedField.fieldIndex === fieldIndex) {
+                                      setSelectedField(null);
+                                    } else {
+                                      setSelectedField({
+                                        pageIndex: activePage,
+                                        fieldIndex,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {selectedField && 
+                                   selectedField.pageIndex === activePage && 
+                                   selectedField.fieldIndex === fieldIndex ? 
+                                    'Chiudi' : 'Modifica'}
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            {selectedField && 
+                             selectedField.pageIndex === activePage && 
+                             selectedField.fieldIndex === fieldIndex && (
+                              <CardContent className="px-4 pb-4">
+                                <FormFieldEditor
+                                  field={field}
+                                  pageIndex={activePage}
+                                  fieldIndex={fieldIndex}
+                                />
+                              </CardContent>
+                            )}
+                          </Card>
+                        ))}
+                        {form.pages[activePage]?.fields.length === 0 && (
+                          <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-md">
+                            <p className="text-muted-foreground mb-4">
+                              Nessun campo in questa pagina
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                {/* Sidebar: Always visible, draggable field types */}
+                <div className="lg:col-span-1">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Tipi di Campo</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-2">
+                      {fieldTypes.map((ft) => (
+                        <div
+                          key={ft.type}
+                          className="flex items-center gap-2 p-2 rounded-md border border-border bg-card cursor-move mb-2"
+                          draggable
+                          onDragStart={(e) => handleSidebarDragStart(e, ft.type)}
+                        >
+                          {getFieldIcon(ft.type)}
+                          <span>{ft.label}</span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="settings">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Impostazioni Form</CardTitle>
+                  <CardDescription>
+                    Personalizza le impostazioni del form
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Aspetto</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="theme">Tema</Label>
+                        <Select
+                          value={form.settings.themeName}
+                          onValueChange={(value) => handleSettingChange('themeName', value)}
+                        >
+                          <SelectTrigger id="theme">
+                            <SelectValue placeholder="Seleziona tema" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Default</SelectItem>
+                            <SelectItem value="modern">Modern</SelectItem>
+                            <SelectItem value="classic">Classic</SelectItem>
+                            <SelectItem value="minimal">Minimal</SelectItem>
+                            <SelectItem value="corporate">Corporate</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="submit-text">Testo Pulsante Invio</Label>
+                        <Input
+                          id="submit-text"
+                          value={form.settings.submitButtonText}
+                          onChange={(e) => handleSettingChange('submitButtonText', e.target.value)}
+                        />
+                      </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="submit-text">Testo Pulsante Invio</Label>
-                      <Input
-                        id="submit-text"
-                        value={form.settings.submitButtonText}
-                        onChange={(e) => handleSettingChange('submitButtonText', e.target.value)}
-                      />
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="show-progress"
+                          checked={form.settings.showProgressBar}
+                          onCheckedChange={(checked) => handleSettingChange('showProgressBar', checked)}
+                        />
+                        <Label htmlFor="show-progress">Mostra barra di avanzamento</Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="show-titles"
+                          checked={form.settings.showPageTitles}
+                          onCheckedChange={(checked) => handleSettingChange('showPageTitles', checked)}
+                        />
+                        <Label htmlFor="show-titles">Mostra titoli delle pagine</Label>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="show-progress"
-                        checked={form.settings.showProgressBar}
-                        onCheckedChange={(checked) => handleSettingChange('showProgressBar', checked)}
-                      />
-                      <Label htmlFor="show-progress">Mostra barra di avanzamento</Label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="show-titles"
-                        checked={form.settings.showPageTitles}
-                        onCheckedChange={(checked) => handleSettingChange('showPageTitles', checked)}
-                      />
-                      <Label htmlFor="show-titles">Mostra titoli delle pagine</Label>
-                    </div>
-                  </div>
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Comportamento</h3>
+                  <Separator />
                   
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="allow-save"
-                        checked={form.settings.allowSave}
-                        onCheckedChange={(checked) => handleSettingChange('allowSave', checked)}
+                    <h3 className="text-lg font-medium">Comportamento</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="allow-save"
+                          checked={form.settings.allowSave}
+                          onCheckedChange={(checked) => handleSettingChange('allowSave', checked)}
+                        />
+                        <Label htmlFor="allow-save">Permetti di salvare e riprendere</Label>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="success-message">Messaggio di successo</Label>
+                      <Textarea
+                        id="success-message"
+                        value={form.settings.successMessage}
+                        onChange={(e) => handleSettingChange('successMessage', e.target.value)}
+                        placeholder="Messaggio mostrato dopo l'invio del form"
                       />
-                      <Label htmlFor="allow-save">Permetti di salvare e riprendere</Label>
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="success-message">Messaggio di successo</Label>
-                    <Textarea
-                      id="success-message"
-                      value={form.settings.successMessage}
-                      onChange={(e) => handleSettingChange('successMessage', e.target.value)}
-                      placeholder="Messaggio mostrato dopo l'invio del form"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleSaveForm} disabled={saving}>
-                  <Save className="h-4 w-4 mr-1" />
-                  {saving ? 'Salvando...' : 'Salva Impostazioni'}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="logic">
-            <Card>
-              <CardHeader>
-                <CardTitle>Logica Condizionale</CardTitle>
-                <CardDescription>
-                  Configura la logica condizionale del form
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="min-h-[300px] flex flex-col items-center justify-center">
-                <Settings className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Logica Condizionale</h3>
-                <p className="text-muted-foreground mb-4 text-center max-w-md">
-                  La logica condizionale permette di mostrare o nascondere campi e pagine in base alle risposte dell'utente.
-                </p>
-                <Button>
-                  <Plus className="h-4 w-4 mr-1" /> Aggiungi Regola
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={handleSaveForm} disabled={saving}>
+                    <Save className="h-4 w-4 mr-1" />
+                    {saving ? 'Salvando...' : 'Salva Impostazioni'}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="logic">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Logica Condizionale</CardTitle>
+                  <CardDescription>
+                    Configura la logica condizionale del form
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="min-h-[300px] flex flex-col items-center justify-center">
+                  <Settings className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Logica Condizionale</h3>
+                  <p className="text-muted-foreground mb-4 text-center max-w-md">
+                    La logica condizionale permette di mostrare o nascondere campi e pagine in base alle risposte dell'utente.
+                  </p>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-1" /> Aggiungi Regola
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </DragDropContext>
       )}
       
       <AlertDialog>
