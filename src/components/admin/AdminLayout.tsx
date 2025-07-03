@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -200,8 +199,8 @@ const AdminLayout = ({ children }) => {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <main className="flex-1 relative overflow-y-auto focus:outline-none p-6">
+      <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+        <main className="flex-1 p-0" style={{ minHeight: '100vh', overflow: 'visible' }}>
           {children}
         </main>
       </div>

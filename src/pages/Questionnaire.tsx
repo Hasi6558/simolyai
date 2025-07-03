@@ -17,6 +17,7 @@ interface Question {
   options?: Array<{ id: string; value: string; label: string; image?: string }>;
   required: boolean;
   guide?: string;
+  lesson?: string;
   maxStars?: number;
   min?: number;
   max?: number;
@@ -298,116 +299,37 @@ const Questionnaire = () => {
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [upcomingQuestionnaires, setUpcomingQuestionnaires] = useState<any[]>([]);
+  const [showLesson, setShowLesson] = useState(false);
   
   // Fetch questionnaire data
   useEffect(() => {
     const fetchQuestionnaire = async () => {
+      setLoading(true);
       try {
-        // Mock data - in a real app, you'd fetch from an API
-        setTimeout(() => {
-          const mockQuestionnaire = {
-            id: id || '123',
-            title: 'Valutazione Maturità Digitale',
-            description: 'Questo questionario valuta il livello di maturità digitale della tua azienda.',
-            questions: [
-              {
-                id: 'q1',
-                type: 'radio',
-                title: 'Qual è il livello di digitalizzazione dei processi interni?',
-                guide: 'Valuta quanto i processi interni dell\'azienda sono stati digitalizzati. Considera aspetti come la gestione documentale, comunicazioni interne, approvazioni, ecc.',
-                options: [
-                  { id: 'opt1', value: '1', label: 'Basso - Processi principalmente cartacei' },
-                  { id: 'opt2', value: '2', label: 'Medio-basso - Alcuni processi digitalizzati' },
-                  { id: 'opt3', value: '3', label: 'Medio - Circa metà dei processi sono digitalizzati' },
-                  { id: 'opt4', value: '4', label: 'Medio-alto - La maggior parte dei processi sono digitalizzati' },
-                  { id: 'opt5', value: '5', label: 'Alto - Processi completamente digitalizzati' }
-                ],
-                required: true
-              },
-              {
-                id: 'q2',
-                type: 'radio',
-                title: 'Quanto è avanzata la vostra infrastruttura IT?',
-                guide: 'Considera aspetti come l\'aggiornamento dell\'hardware, del software, la sicurezza informatica, e l\'utilizzo del cloud.',
-                options: [
-                  { id: 'opt1', value: '1', label: 'Base - Hardware e software obsoleti' },
-                  { id: 'opt2', value: '2', label: 'Medio-bassa - Alcune componenti aggiornate' },
-                  { id: 'opt3', value: '3', label: 'Media - Infrastruttura parzialmente aggiornata' },
-                  { id: 'opt4', value: '4', label: 'Medio-alta - Infrastruttura moderna' },
-                  { id: 'opt5', value: '5', label: 'Avanzata - Infrastruttura all\'avanguardia e cloud-based' }
-                ],
-                required: true
-              },
-              {
-                id: 'q3',
-                type: 'radio',
-                title: 'Come valuti le competenze digitali del personale?',
-                guide: 'Valuta il livello di familiarità e competenza del personale con gli strumenti digitali utilizzati dall\'azienda, la capacità di adattamento a nuove tecnologie e la formazione continua.',
-                options: [
-                  { id: 'opt1', value: '1', label: 'Basse - Difficoltà con strumenti digitali base' },
-                  { id: 'opt2', value: '2', label: 'Medio-basse - Competenze minime' },
-                  { id: 'opt3', value: '3', label: 'Medie - Competenze adeguate per i ruoli' },
-                  { id: 'opt4', value: '4', label: 'Medio-alte - Buone competenze digitali' },
-                  { id: 'opt5', value: '5', label: 'Alte - Personale altamente qualificato in competenze digitali' }
-                ],
-                required: true
-              },
-              {
-                id: 'q4',
-                type: 'text',
-                title: 'Quali sono le principali sfide digitali che la tua azienda sta affrontando?',
-                guide: 'Descrivi le principali difficoltà o ostacoli che la tua azienda sta incontrando nel processo di trasformazione digitale.',
-                required: false
-              },
-              {
-                id: 'q5',
-                type: 'checkbox',
-                title: 'Quali tecnologie emergenti state considerando di adottare nei prossimi 12 mesi?',
-                guide: 'Seleziona tutte le tecnologie che state valutando di implementare nel prossimo anno.',
-                options: [
-                  { id: 'opt1', value: 'ai', label: 'Intelligenza Artificiale' },
-                  { id: 'opt2', value: 'blockchain', label: 'Blockchain' },
-                  { id: 'opt3', value: 'iot', label: 'Internet of Things (IoT)' },
-                  { id: 'opt4', value: 'cloud', label: 'Migrazione al Cloud' },
-                  { id: 'opt5', value: 'automation', label: 'Automazione dei processi' },
-                  { id: 'opt6', value: 'data_analytics', label: 'Analisi dei dati avanzata' },
-                  { id: 'opt7', value: 'none', label: 'Nessuna' }
-                ],
-                required: true
-              }
-            ]
-          };
-          
-          // Carica i futuri questionari disponibili per l'utente
-          const futureDemoQuestionnaires = [
-            {
-              id: 'q1',
-              title: 'Valutazione Bisogni Formativi',
-              availableDate: '15/06/2025'
-            },
-            {
-              id: 'q2',
-              title: 'Indagine Soddisfazione Cliente',
-              availableDate: '30/09/2025'
-            }
-          ];
-          
-          setUpcomingQuestionnaires(futureDemoQuestionnaires);
-          setQuestionnaire(mockQuestionnaire);
-          setLoading(false);
-        }, 1000);
+        const res = await fetch(`/api/forms/${id}`);
+        if (!res.ok) throw new Error('Questionnaire not found');
+        const data = await res.json();
+        setQuestionnaire({
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          questions: Array.isArray(data.questions)
+            ? data.questions.flatMap(page => page.fields || [])
+            : [],
+        });
       } catch (error) {
-        console.error('Error fetching questionnaire:', error);
         toast({
           title: 'Errore',
           description: 'Impossibile caricare il questionario',
           variant: 'destructive',
         });
+        setQuestionnaire(null);
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchQuestionnaire();
+    if (id) fetchQuestionnaire();
   }, [id, toast]);
 
   const handlePreviousQuestion = () => {
@@ -541,6 +463,20 @@ const Questionnaire = () => {
   const currentQuestion = questionnaire.questions[currentQuestionIndex];
   const progress = Math.round(((currentQuestionIndex + 1) / questionnaire.questions.length) * 100);
 
+  // Add demo data for future questionnaires
+  const futureQuestionnaires = [
+    {
+      id: 'future-1',
+      title: 'Valutazione Bisogni Formativi',
+      availableDate: '15/06/2025'
+    },
+    {
+      id: 'future-2',
+      title: 'Indagine Soddisfazione Cliente',
+      availableDate: '30/09/2025'
+    }
+  ];
+
   return (
     <div className="container mx-auto">
       <MainNavigation variant="questionnaire" title={questionnaire.title} />
@@ -562,54 +498,59 @@ const Questionnaire = () => {
 
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2">
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle>{currentQuestion.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <QuestionForm
-                  question={currentQuestion}
-                  value={answers[currentQuestion.id] || ''}
-                  onChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                />
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button
-                  variant="outline"
-                  onClick={handlePreviousQuestion}
-                  disabled={currentQuestionIndex === 0}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Precedente
-                </Button>
-                
-                <div className="flex space-x-2">
-                  <Button 
+            <div
+              onMouseEnter={() => setShowLesson(true)}
+              onMouseLeave={() => setShowLesson(false)}
+            >
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle>{currentQuestion.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <QuestionForm
+                    question={currentQuestion}
+                    value={answers[currentQuestion.id] || ''}
+                    onChange={(value) => handleAnswerChange(currentQuestion.id, value)}
+                  />
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button
                     variant="outline"
-                    onClick={() => setDraftConfirmOpen(true)}
-                    className="flex items-center"
+                    onClick={handlePreviousQuestion}
+                    disabled={currentQuestionIndex === 0}
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Salva in bozza
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Precedente
                   </Button>
                   
-                  {currentQuestionIndex < questionnaire.questions.length - 1 ? (
-                    <Button onClick={handleNextQuestion}>
-                      Successiva
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  ) : (
+                  <div className="flex space-x-2">
                     <Button 
-                      onClick={() => setSubmitConfirmOpen(true)} 
-                      disabled={saving}
+                      variant="outline"
+                      onClick={() => setDraftConfirmOpen(true)}
+                      className="flex items-center"
                     >
-                      <Send className="h-4 w-4 mr-1" />
-                      Invia
+                      <Save className="h-4 w-4 mr-2" />
+                      Salva in bozza
                     </Button>
-                  )}
-                </div>
-              </CardFooter>
-            </Card>
+                    
+                    {currentQuestionIndex < questionnaire.questions.length - 1 ? (
+                      <Button onClick={handleNextQuestion}>
+                        Successiva
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={() => setSubmitConfirmOpen(true)} 
+                        disabled={saving}
+                      >
+                        <Send className="h-4 w-4 mr-1" />
+                        Invia
+                      </Button>
+                    )}
+                  </div>
+                </CardFooter>
+              </Card>
+            </div>
           </div>
           
           <div className="md:col-span-1">
@@ -638,11 +579,21 @@ const Questionnaire = () => {
                     )}
                   </div>
                 )}
+
+                {/* LESSON/APPROFONDIMENTO: show only on hover */}
+                {currentQuestion.lesson && showLesson && (
+                  <div className="bg-yellow-50 p-4 rounded-md min-h-[80px] flex flex-col justify-start items-center">
+                    <span className="font-medium mb-2">Approfondimento</span>
+                    <div className="mt-2 w-full">
+                      <p className="text-sm text-yellow-800 text-center">{currentQuestion.lesson}</p>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="space-y-3 mt-6">
                   <h3 className="font-medium">Questionari Futuri</h3>
-                  {upcomingQuestionnaires.map((q, idx) => (
-                    <div key={idx} className="p-3 border rounded-md">
+                  {futureQuestionnaires.map((q, idx) => (
+                    <div key={q.id} className="p-3 border rounded-md">
                       <p className="font-medium">{q.title}</p>
                       <p className="text-xs text-gray-500">Disponibile dal: {q.availableDate}</p>
                     </div>

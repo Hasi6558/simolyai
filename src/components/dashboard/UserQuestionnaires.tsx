@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,16 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Loader2, FileText, Plus, CheckSquare, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+// import { fetchAvailableQuestionnaires } from '@/services/questionnaire';
 
 interface Questionnaire {
   id: string;
   title: string;
-  type: string;
-  status: 'completed' | 'in_progress' | 'not_started' | 'available' | 'locked' | 'waiting';
-  last_updated?: string;
-  next_available_date?: string;
-  description?: string;
-  sequence?: number;
+  status: string;
+  // Optionally add more fields as needed
 }
 
 export const UserQuestionnaires = () => {
@@ -31,50 +27,15 @@ export const UserQuestionnaires = () => {
   useEffect(() => {
     const loadQuestionnaires = async () => {
       if (!user) return;
-      
       try {
         setIsLoading(true);
-        
-        // In un'implementazione reale, recupereremmo i dati da Supabase
-        // Per ora, utilizziamo dei dati di esempio che riflettono il piano dell'utente
-        const demoQuestionnaires: Questionnaire[] = [
-          {
-            id: '1',
-            title: 'Valutazione Maturità Digitale',
-            type: 'Maturità Digitale',
-            status: 'available',
-            description: 'Valuta il livello di digitalizzazione della tua azienda',
-            sequence: 1
-          },
-          {
-            id: '2',
-            title: 'Analisi Competenze',
-            type: 'Formazione',
-            status: 'locked',
-            description: 'Analizza le competenze digitali del personale',
-            sequence: 2
-          },
-          {
-            id: '3',
-            title: 'Valutazione Infrastruttura IT',
-            type: 'Tecnologia',
-            status: 'waiting',
-            next_available_date: '2025-06-15',
-            description: 'Valuta lo stato attuale dell\'infrastruttura IT',
-            sequence: 3
-          },
-          {
-            id: '4',
-            title: 'Questionario Sicurezza Informatica',
-            type: 'Sicurezza',
-            status: 'completed',
-            last_updated: new Date().toISOString(),
-            description: 'Verifica le misure di sicurezza informatica adottate',
-            sequence: 4
-          }
-        ];
-        
-        setQuestionnaires(demoQuestionnaires);
+        // Fetch published questionnaires from backend API
+        const res = await fetch('/api/forms');
+        const data = await res.json();
+        console.log('Fetched questionnaires from /api/forms:', data);
+        // Only show published forms
+        const published = Array.isArray(data) ? data.filter(q => q.status === 'published') : [];
+        setQuestionnaires(published);
       } catch (error) {
         console.error('Errore nel caricamento dei questionari:', error);
         toast({
@@ -179,23 +140,8 @@ export const UserQuestionnaires = () => {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 {getStatusBadge(questionnaire.status)}
-                {questionnaire.sequence && (
-                  <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-medium">
-                    Sequenza {questionnaire.sequence}
-                  </span>
-                )}
               </div>
               <h3 className="font-semibold text-lg">{questionnaire.title}</h3>
-              <p className="text-sm text-gray-600 mt-1">{questionnaire.description}</p>
-              <div className="flex space-x-4 text-xs text-muted-foreground mt-2">
-                <span>Tipo: {questionnaire.type}</span>
-                {questionnaire.last_updated && (
-                  <span>Ultimo aggiornamento: {new Date(questionnaire.last_updated).toLocaleDateString('it-IT')}</span>
-                )}
-                {questionnaire.next_available_date && (
-                  <span>Disponibile dal: {format(new Date(questionnaire.next_available_date), 'dd MMMM yyyy', { locale: it })}</span>
-                )}
-              </div>
             </div>
             <Button 
               onClick={() => handleStartQuestionnaire(questionnaire.id)}

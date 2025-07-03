@@ -33,6 +33,7 @@ import PagePreview from './pages/PagePreview';
 import Report from './pages/Report';
 import FormEditorPage from './components/form-builder/FormEditorPage';
 import UserDashboard from './pages/UserDashboard';
+import FormBuilderTestStandalone from './pages/admin/FormBuilderTestStandalone';
 // import FormBuilderV2 from './FormBuilderV2';
 
 import {
@@ -183,6 +184,7 @@ const App = () => {
               <ReportsPage />
             </AdminLayout>
           } />
+          <Route path="/admin/form-builder-test" element={<FormBuilderTestStandalone />} />
         </Routes>
         <Toaster />
       </AuthProvider>
