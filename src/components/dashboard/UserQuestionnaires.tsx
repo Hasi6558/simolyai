@@ -31,11 +31,18 @@ export const UserQuestionnaires = () => {
         setIsLoading(true);
         // Fetch published questionnaires from backend API
         const res = await fetch('/api/forms');
-        const data = await res.json();
-        console.log('Fetched questionnaires from /api/forms:', data);
-        // Only show published forms
-        const published = Array.isArray(data) ? data.filter(q => q.status === 'published') : [];
-        setQuestionnaires(published);
+        const result = await res.json();
+        console.log('Fetched questionnaires from /api/forms:', result);
+        
+        // Check if the response has the correct structure
+        if (result.success && result.data) {
+          // Only show published forms
+          const published = Array.isArray(result.data) ? result.data.filter(q => q.status === 'published') : [];
+          setQuestionnaires(published);
+        } else {
+          console.error('Invalid API response structure:', result);
+          setQuestionnaires([]);
+        }
       } catch (error) {
         console.error('Errore nel caricamento dei questionari:', error);
         toast({
@@ -52,7 +59,7 @@ export const UserQuestionnaires = () => {
   }, [user, toast]);
   
   const handleStartQuestionnaire = (id: string) => {
-    navigate(`/questionnaire/${id}`);
+    navigate(`/questionnaire-surveyjs/${id}`);
   };
   
   const getStatusBadge = (status: string) => {

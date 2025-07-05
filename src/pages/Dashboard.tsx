@@ -308,7 +308,7 @@ const Dashboard = () => {
                           <Button 
                             variant={questionnaire.status === 'available' ? 'default' : 'outline'} 
                             disabled={questionnaire.status !== 'available'}
-                            onClick={() => navigate(`/questionnaire/${questionnaire.id}`)}
+                            onClick={() => navigate(`/questionnaire-surveyjs/${questionnaire.id}`)}
                           >
                             {questionnaire.status === 'available' ? 'Compila ora' : 'Visualizza'}
                           </Button>

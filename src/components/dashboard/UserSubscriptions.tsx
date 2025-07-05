@@ -211,7 +211,7 @@ export const UserSubscriptions = () => {
               variant="ghost" 
               size="sm" 
               disabled={q.status === 'pending'}
-              onClick={() => window.location.href = `/questionnaire/${q.id}`}
+                              onClick={() => window.location.href = `/questionnaire-surveyjs/${q.id}`}
             >
               {q.status === 'completed' ? 'Visualizza' : q.status === 'available' ? 'Compila' : 'In attesa'}
             </Button>

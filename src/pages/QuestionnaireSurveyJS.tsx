@@ -26,15 +26,27 @@ export default function QuestionnaireSurveyJS() {
         }
         
         const result = await response.json();
+        console.log('API Response:', result);
+        console.log('Full API Response Structure:', JSON.stringify(result, null, 2));
+        
         if (!result.success || !result.data) {
           throw new Error('Invalid form data');
         }
 
         const formData = result.data;
+        console.log('Form Data:', formData);
+        console.log('Questions Structure:', JSON.stringify(formData.questions, null, 2));
         
         // Create SurveyJS survey from the stored JSON
         const surveyJson = formData.questions || {};
         const surveyInstance = new Model(surveyJson);
+
+        // Store the original question data for accessing lesson information
+        const originalQuestionsData = formData.questions?.pages?.[0]?.elements || [];
+        const questionsMap = new Map();
+        originalQuestionsData.forEach(q => {
+          questionsMap.set(q.name, q);
+        });
         
         // Set up survey events
         surveyInstance.onComplete.add((sender, options) => {
@@ -50,14 +62,22 @@ export default function QuestionnaireSurveyJS() {
           
           if (!questionElement) return;
 
-          // Add custom properties display
+          // Get lesson data from the original question data
+          const originalQuestionData = questionsMap.get(question.name);
+          const lessonText = originalQuestionData?.lesson || null;
+          const guideText = originalQuestionData?.guide || null;
+          
+          console.log('Question Name:', question.name);
+          console.log('Original Question Data:', originalQuestionData);
+          console.log('Lesson Text:', lessonText);
+          console.log('Guide Text:', guideText);
           const customPropsContainer = document.createElement('div');
           customPropsContainer.className = 'custom-props-container mt-4 p-4 bg-gray-50 rounded-lg';
           
           let hasCustomProps = false;
 
           // Add guide if present
-          if (question.guide) {
+          if (guideText) {
             hasCustomProps = true;
             const guideDiv = document.createElement('div');
             guideDiv.className = 'guide-container mb-3';
@@ -68,13 +88,13 @@ export default function QuestionnaireSurveyJS() {
                 </svg>
                 <span class="font-medium text-sm">Guide</span>
               </div>
-              <p class="text-sm text-gray-700">${question.guide}</p>
+              <p class="text-sm text-gray-700">${guideText}</p>
             `;
             customPropsContainer.appendChild(guideDiv);
           }
 
-          // Add lesson if present
-          if (question.lesson) {
+          // Add lesson if present (using test data for demonstration)
+          if (lessonText) {
             hasCustomProps = true;
             const lessonDiv = document.createElement('div');
             lessonDiv.className = 'lesson-container mb-3';
@@ -85,7 +105,7 @@ export default function QuestionnaireSurveyJS() {
                 </svg>
                 <span class="font-medium text-sm">Lesson</span>
               </div>
-              <p class="text-sm text-gray-700">${question.lesson}</p>
+              <p class="text-sm text-gray-700">${lessonText}</p>
             `;
             customPropsContainer.appendChild(lessonDiv);
           }
@@ -150,14 +170,14 @@ export default function QuestionnaireSurveyJS() {
           }
 
           // Add hover functionality for lesson display in sidebar
-          if (question.lesson) {
+          if (lessonText) {
             questionElement.addEventListener('mouseenter', () => {
               const sidebar = document.getElementById('lesson-sidebar');
               if (sidebar) {
                 sidebar.innerHTML = `
                   <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 class="font-medium text-yellow-800 mb-2">${question.title || 'Question'}</h4>
-                    <p class="text-yellow-700">${question.lesson}</p>
+                    <h4 class="font-medium text-yellow-800 mb-2">${question.title || question.name || 'Question'}</h4>
+                    <p class="text-yellow-700">${lessonText}</p>
                   </div>
                 `;
               }

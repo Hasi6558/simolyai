@@ -68,7 +68,7 @@ const QuestionForm = ({ question, value, onChange }) => {
                 >
                   {option.label}
                 </label>
-              </div>
+              </div>  
             </div>
           ))}
         </div>
@@ -308,16 +308,47 @@ const Questionnaire = () => {
       try {
         const res = await fetch(`/api/forms/${id}`);
         if (!res.ok) throw new Error('Questionnaire not found');
-        const data = await res.json();
+        const result = await res.json();
+        
+        console.log('Questionnaire API Response:', result);
+        
+        // Check if the response has the correct structure
+        if (!result.success || !result.data) {
+          throw new Error('Invalid API response structure');
+        }
+        
+        const data = result.data;
+        
+        // Process the questions from the SurveyJS format
+        let questions = [];
+        if (data.questions && data.questions.pages && data.questions.pages.length > 0) {
+          // Extract questions from SurveyJS format
+          questions = data.questions.pages[0].elements?.map(element => ({
+            id: element.name,
+            type: element.type,
+            title: element.title || element.name,
+            description: element.description,
+            required: element.isRequired || false,
+            guide: element.guide,
+            lesson: element.lesson,
+            options: element.choices?.map((choice, index) => ({
+              id: `option-${index}`,
+              value: choice,
+              label: choice
+            })) || []
+          })) || [];
+        }
+        
+        console.log('Processed questions:', questions);
+        
         setQuestionnaire({
           id: data.id,
           title: data.title,
           description: data.description,
-          questions: Array.isArray(data.questions)
-            ? data.questions.flatMap(page => page.fields || [])
-            : [],
+          questions: questions,
         });
       } catch (error) {
+        console.error('Error fetching questionnaire:', error);
         toast({
           title: 'Errore',
           description: 'Impossibile caricare il questionario',

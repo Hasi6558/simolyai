@@ -192,7 +192,7 @@ const QuestionnaireView = () => {
   };
   
   const handleStartQuestionnaire = (questionnaireId: string) => {
-    navigate(`/questionnaire/${questionnaireId}`);
+            navigate(`/questionnaire-surveyjs/${questionnaireId}`);
   };
   
   if (isLoading) {
