@@ -59,7 +59,7 @@ export const UserQuestionnaires = () => {
   }, [user, toast]);
   
   const handleStartQuestionnaire = (id: string) => {
-    navigate(`/questionnaire-surveyjs/${id}`);
+    navigate(`/questionnaire/${id}`);
   };
   
   const getStatusBadge = (status: string) => {
