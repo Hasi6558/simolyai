@@ -28,12 +28,9 @@ const createTable = async () => {
 
     console.log('✅ questionnaire_config table created successfully');
 
-    // Create index for better performance
-    await connection.execute(`
-      CREATE INDEX IF NOT EXISTS idx_questionnaire_status ON questionnaire_config(status);
-    `);
-
-    console.log('✅ Indexes created successfully');
+    // Note: MySQL doesn't support IF NOT EXISTS for indexes
+    // Index will be created manually if needed for performance
+    console.log('✅ Migration completed successfully');
 
   } catch (error) {
     console.error('❌ Error creating table:', error);

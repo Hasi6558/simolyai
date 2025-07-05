@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, MoreVertical, Trash2, Copy, Edit, FileText, Layout } from 'lucide-react';
+import { Plus, MoreVertical, Trash2, Copy, Edit, FileText, Layout, Eye } from 'lucide-react';
 
 const FormBuilder = () => {
   const navigate = useNavigate();
@@ -35,8 +35,13 @@ const FormBuilder = () => {
       try {
         const res = await fetch('/api/forms');
         if (!res.ok) throw new Error('Errore nel recupero dei forms');
-        const data = await res.json();
-        setForms(data || []);
+        const result = await res.json();
+        
+        if (result.success) {
+          setForms(result.data || []);
+        } else {
+          throw new Error(result.message || 'Errore nel recupero dei forms');
+        }
       } catch (err: any) {
         setError(err.message || 'Errore sconosciuto');
       } finally {
@@ -52,7 +57,7 @@ const FormBuilder = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  const filteredForms = forms
+  const filteredForms = (Array.isArray(forms) ? forms : [])
     .filter(form => form.status === 'published')
     .filter(form => {
       const matchesSearch = form.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -70,16 +75,17 @@ const FormBuilder = () => {
   };
 
   const handleDuplicate = (formId: string) => {
-    const formToDuplicate = forms.find(f => f.id === formId);
+    const formsArray = Array.isArray(forms) ? forms : [];
+    const formToDuplicate = formsArray.find(f => f.id === formId);
     if (formToDuplicate) {
       const newForm = {
         ...formToDuplicate,
-        id: (forms.length + 1).toString(),
+        id: (formsArray.length + 1).toString(),
         title: `${formToDuplicate.title} (Copia)`,
         createdAt: new Date().toISOString().split('T')[0]
       };
       
-      setForms([...forms, newForm]);
+      setForms([...formsArray, newForm]);
       toast({
         title: 'Form duplicato',
         description: `"${formToDuplicate.title}" è stato duplicato con successo.`
@@ -94,7 +100,8 @@ const FormBuilder = () => {
 
   const confirmDelete = () => {
     if (deleteFormId) {
-      setForms(forms.filter(f => f.id !== deleteFormId));
+      const formsArray = Array.isArray(forms) ? forms : [];
+      setForms(formsArray.filter(f => f.id !== deleteFormId));
       setDeleteDialogOpen(false);
       toast({
         title: 'Form eliminato',
@@ -104,14 +111,15 @@ const FormBuilder = () => {
   };
 
   const handleToggleActive = (formId: string) => {
-    setForms(forms.map(form => {
+    const formsArray = Array.isArray(forms) ? forms : [];
+    setForms(formsArray.map(form => {
       if (form.id === formId) {
         return { ...form, active: !form.active };
       }
       return form;
     }));
     
-    const form = forms.find(f => f.id === formId);
+    const form = formsArray.find(f => f.id === formId);
     if (form) {
       toast({
         title: 'Stato aggiornato',
@@ -200,6 +208,10 @@ const FormBuilder = () => {
                       <DropdownMenuItem onClick={() => handleEdit(form.id)}>
                         <Edit className="mr-2 h-4 w-4" />
                         <span className="truncate">Modifica Form</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => window.open(`/questionnaire-surveyjs/${form.id}`, '_blank')}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        <span className="truncate">Test Form</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleEditPageLayout(form.id)}>
                         <Layout className="mr-2 h-4 w-4" />

@@ -33,7 +33,7 @@ export default function QuestionnaireSurveyJS() {
         const formData = result.data;
         
         // Create SurveyJS survey from the stored JSON
-        const surveyJson = formData.surveyJSON || {};
+        const surveyJson = formData.questions || {};
         const surveyInstance = new Model(surveyJson);
         
         // Set up survey events

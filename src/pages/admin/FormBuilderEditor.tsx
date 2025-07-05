@@ -111,7 +111,7 @@ export default function FormBuilderEditor() {
           if (result.success && result.data) {
             const form = result.data;
             // Set the form data in SurveyJS Creator
-            creatorRef.current.JSON = form.surveyJSON || {};
+            creatorRef.current.JSON = form.questions || {};
             // Set form title and description
             creatorRef.current.survey.title = form.title || '';
             creatorRef.current.survey.description = form.description || '';

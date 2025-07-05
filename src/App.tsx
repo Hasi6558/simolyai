@@ -24,6 +24,7 @@ import Profile from './pages/Profile';
 import SettingsPage from './pages/SettingsPage';
 import Dashboard from './pages/Dashboard';
 import Questionnaire from './pages/Questionnaire';
+import QuestionnaireSurveyJS from './pages/QuestionnaireSurveyJS';
 import FormPreview from './pages/FormPreview';
 import AdminLayout from './components/admin/AdminLayout';
 import Guide from './pages/Guide';
@@ -86,6 +87,7 @@ const App = () => {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/dashboard/*" element={<UserDashboard />} />
           <Route path="/questionnaire/:id" element={<Questionnaire />} />
+          <Route path="/questionnaire-surveyjs/:id" element={<QuestionnaireSurveyJS />} />
           <Route path="/form-preview/:id" element={<FormPreview />} />
           <Route path="/page-preview/:id" element={<PagePreview />} />
           <Route path="/report/:id" element={<Report />} />
