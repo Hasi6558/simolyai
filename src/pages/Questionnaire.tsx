@@ -8,6 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import MainNavigation from '@/components/MainNavigation';
 import QuestionSaveConfirmation from '@/components/questionSaveConfirmation';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Model } from 'survey-core';
+import { Survey } from 'survey-react-ui';
+import { useMediaQuery } from 'react-responsive';
 
 interface Question {
   id: string;
@@ -39,306 +42,15 @@ interface QuestionnaireData {
   questions: Question[];
 }
 
-// Funzione di utility per renderizzare l'input della domanda
-const QuestionForm = ({ question, value, onChange }) => {
-  switch (question.type) {
-    case 'radio':
-      return (
-        <div className="space-y-3 mt-4">
-          {question.options?.map((option, idx) => (
-            <div
-              key={idx}
-              className={`p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                value === option.value
-                  ? 'border-purple-600 bg-purple-50'
-                  : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-              }`}
-              onClick={() => onChange(option.value)}
-            >
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id={`option-${question.id}-${idx}`}
-                  name={`question-${question.id}`}
-                  checked={value === option.value}
-                  onChange={() => onChange(option.value)}
-                  className="mr-3 text-purple-600"
-                />
-                <label
-                  htmlFor={`option-${question.id}-${idx}`}
-                  className="cursor-pointer w-full text-gray-700"
-                >
-                  {option.label}
-                </label>
-              </div>  
-            </div>
-          ))}
-        </div>
-      );
-    case 'checkbox':
-      return (
-        <div className="space-y-3 mt-4">
-          {question.options?.map((option, idx) => {
-            const isChecked = Array.isArray(value) && value.includes(option.value);
-            return (
-              <div
-                key={idx}
-                className={`p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                  isChecked
-                    ? 'border-purple-600 bg-purple-50'
-                    : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                }`}
-                onClick={() => {
-                  const newValue = Array.isArray(value) ? [...value] : [];
-                  if (isChecked) {
-                    onChange(newValue.filter(v => v !== option.value));
-                  } else {
-                    onChange([...newValue, option.value]);
-                  }
-                }}
-              >
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`option-${question.id}-${idx}`}
-                    checked={isChecked}
-                    onChange={() => {
-                      const newValue = Array.isArray(value) ? [...value] : [];
-                      if (isChecked) {
-                        onChange(newValue.filter(v => v !== option.value));
-                      } else {
-                        onChange([...newValue, option.value]);
-                      }
-                    }}
-                    className="mr-3 text-purple-600"
-                  />
-                  <label
-                    htmlFor={`option-${question.id}-${idx}`}
-                    className="cursor-pointer w-full text-gray-700"
-                  >
-                    {option.label}
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    case 'text':
-      return (
-        <textarea
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Scrivi la tua risposta qui..."
-          className="w-full min-h-[150px] p-4 border-2 border-gray-200 rounded-xl mt-4 focus:border-purple-400 focus:ring focus:ring-purple-200"
-        />
-      );
-    case 'image-choice':
-      return (
-        <div className="flex flex-wrap gap-4 mt-4">
-          {question.options?.map((option, idx) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`border-2 rounded-xl p-2 flex flex-col items-center w-32 h-40 cursor-pointer transition-colors ${
-                value === option.value
-                  ? 'border-purple-600 bg-purple-50'
-                  : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-              }`}
-              onClick={() => onChange(option.value)}
-            >
-              <img src={option.image} alt={option.label} className="w-20 h-20 object-contain mb-2" />
-              <span className="text-center text-sm">{option.label}</span>
-            </button>
-          ))}
-        </div>
-      );
-    case 'star-rating':
-      const maxStars = question.maxStars || 5;
-      return (
-        <div className="flex items-center gap-2 mt-4">
-          {[...Array(maxStars)].map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onChange(i + 1)}
-              className="focus:outline-none"
-            >
-              <Star className={`w-8 h-8 ${value >= i + 1 ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
-            </button>
-          ))}
-          {value && <span className="ml-2 text-lg font-medium">{value}</span>}
-        </div>
-      );
-    case 'range':
-      return (
-        <div className="flex flex-col gap-2 mt-4">
-          <input
-            type="range"
-            min={question.min || 0}
-            max={question.max || 10}
-            step={question.step || 1}
-            value={value || question.min || 0}
-            onChange={e => onChange(Number(e.target.value))}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>{question.minLabel || question.min || 0}</span>
-            <span>{value ?? question.min ?? 0}</span>
-            <span>{question.maxLabel || question.max || 10}</span>
-          </div>
-        </div>
-      );
-    case 'currency':
-      return (
-        <div className="flex items-center gap-2 mt-4">
-          <span className="text-lg font-bold">€</span>
-          <input
-            type="number"
-            min={question.min || 0}
-            step={question.step || 1}
-            value={value || ''}
-            onChange={e => onChange(Number(e.target.value))}
-            className="border-2 border-gray-200 rounded-xl p-2 w-32 focus:border-purple-400 focus:ring focus:ring-purple-200"
-            placeholder="0"
-          />
-        </div>
-      );
-    case 'boolean':
-    case 'yesno':
-      return (
-        <div className="flex items-center gap-4 mt-4">
-          <div
-            className={
-              `relative flex items-center w-28 h-12 rounded-full transition-colors duration-200 cursor-pointer ` +
-              (value === true ? 'bg-purple-600' : 'bg-gray-200')
-            }
-            onClick={() => onChange(!value)}
-            style={{ minWidth: 112 }}
-          >
-            {/* No Label */}
-            <span
-              className={
-                'flex-1 text-center z-10 font-medium ' +
-                (value === false ? 'text-purple-600' : 'text-gray-500')
-              }
-            >
-              No
-            </span>
-            {/* Yes Label */}
-            <span
-              className={
-                'flex-1 text-center z-10 font-medium ' +
-                (value === true ? 'text-purple-600' : 'text-gray-500')
-              }
-            >
-              Yes
-            </span>
-            {/* Slider */}
-            <span
-              className="absolute top-1 left-1 w-12 h-10 bg-white rounded-full shadow transition-transform duration-200"
-              style={{
-                transform: value === true ? 'translateX(48px)' : 'translateX(0)'
-              }}
-            ></span>
-          </div>
-        </div>
-      );
-    case 'table':
-      // Table with checkboxes or inputs per cell
-      return (
-        <div className="overflow-x-auto mt-4">
-          <table className="min-w-full border text-center">
-            <thead>
-              <tr>
-                <th className="border p-2"></th>
-                {question.columns?.map((col, cidx) => (
-                  <th key={cidx} className="border p-2">{col.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {question.rows?.map((row, ridx) => (
-                <tr key={ridx}>
-                  <td className="border p-2 font-medium">{row.label}</td>
-                  {question.columns?.map((col, cidx) => (
-                    <td key={cidx} className="border p-2">
-                      {col.type === 'checkbox' ? (
-                        <input
-                          type="checkbox"
-                          checked={Array.isArray(value?.[row.value]) && value[row.value].includes(col.value)}
-                          onChange={e => {
-                            const rowVals = Array.isArray(value?.[row.value]) ? [...value[row.value]] : [];
-                            if (e.target.checked) {
-                              onChange({ ...value, [row.value]: [...rowVals, col.value] });
-                            } else {
-                              onChange({ ...value, [row.value]: rowVals.filter(v => v !== col.value) });
-                            }
-                          }}
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={value?.[row.value]?.[col.value] || ''}
-                          onChange={e => {
-                            onChange({
-                              ...value,
-                              [row.value]: {
-                                ...(value?.[row.value] || {}),
-                                [col.value]: e.target.value
-                              }
-                            });
-                          }}
-                          className="border rounded p-1 w-16"
-                        />
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    case 'file':
-      const fileInputRef = useRef();
-      return (
-        <div className="flex flex-col gap-2 mt-4">
-          <input
-            type="file"
-            ref={fileInputRef}
-            multiple={question.multiple}
-            accept={question.accept || '.doc,.pdf,.xlsx,.png,.gif,.jpg,.jpeg,.tif,.xml'}
-            onChange={e => onChange(e.target.files ? Array.from(e.target.files) : [])}
-            className="block"
-          />
-          <div className="flex flex-wrap gap-2 mt-2">
-            {Array.isArray(value) && value.length > 0 && value.map((file, idx) => (
-              <div key={idx} className="flex items-center gap-1 text-xs bg-gray-100 rounded px-2 py-1">
-                <UploadCloud className="w-4 h-4 text-purple-600" />
-                {file.name}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    default:
-      return <p>Tipo di domanda non supportato</p>;
-  }
-};
-
 const Questionnaire = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [questionnaire, setQuestionnaire] = useState<QuestionnaireData | null>(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  const [visibleQuestions, setVisibleQuestions] = useState<Question[]>([]);
+  const [surveyJson, setSurveyJson] = useState<any>(null);
+  const [surveyTitle, setSurveyTitle] = useState('');
+  const [surveyDescription, setSurveyDescription] = useState('');
   const [guidePopup, setGuidePopup] = useState<{ show: boolean; title: string; content: string }>({
     show: false,
     title: '',
@@ -348,97 +60,249 @@ const Questionnaire = () => {
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [upcomingQuestionnaires, setUpcomingQuestionnaires] = useState<any[]>([]);
   const [showLesson, setShowLesson] = useState(false);
+  const [currentLesson, setCurrentLesson] = useState<string | null>(null);
+  const isDesktop = useMediaQuery({ minWidth: 1024 });
+  const surveyRef = useRef<any>(null);
   
-  // Function to evaluate conditional logic
-  const evaluateCondition = (condition: string, answers: Record<string, any>): boolean => {
-    if (!condition) return true;
+  // Survey model with events - moved before early returns
+  const surveyModel = React.useMemo(() => {
+    console.log('Creating SurveyJS model with:', surveyJson);
+    if (!surveyJson) return null;
     
-    console.log('Evaluating condition:', condition);
-    console.log('Current answers:', answers);
+    const model = new Model(surveyJson);
+    console.log('SurveyJS model created:', model);
     
+    // Register custom properties for guide and lesson
     try {
-      // Handle different SurveyJS conditional formats
+      // Add custom properties to all question types
+      const questionTypes = ['checkbox', 'radiogroup', 'text', 'comment', 'dropdown', 'rating', 'boolean', 'file', 'matrix'];
+      questionTypes.forEach(type => {
+        if (model.questionFactory) {
+          const questionClass = model.questionFactory.createQuestion(type);
+          if (questionClass) {
+            // Register guide property
+            questionClass.addProperty('guide', {
+              type: 'string',
+              category: 'general',
+              title: 'Guide',
+              description: 'Help text for this question'
+            });
+            
+            // Register lesson property
+            questionClass.addProperty('lesson', {
+              type: 'string',
+              category: 'general',
+              title: 'Lesson',
+              description: 'Educational content for this question'
+            });
+          }
+        }
+      });
       
-      // Format 1: "{question1} = 'Yes'"
-      let match = condition.match(/\{([^}]+)\}\s*([=!<>]+)\s*['"]([^'"]*)['"]/);
-      if (match) {
-        const [, questionId, operator, expectedValue] = match;
-        const actualValue = answers[questionId];
-        console.log(`Condition: ${questionId} ${operator} "${expectedValue}", Actual: ${actualValue}`);
-        
-        switch (operator) {
-          case '=':
-            return actualValue === expectedValue;
-          case '!=':
-            return actualValue !== expectedValue;
-          case '>':
-            return Number(actualValue) > Number(expectedValue);
-          case '<':
-            return Number(actualValue) < Number(expectedValue);
-          case '>=':
-            return Number(actualValue) >= Number(expectedValue);
-          case '<=':
-            return Number(actualValue) <= Number(expectedValue);
-          default:
-            return true;
+      console.log('Custom properties registered successfully');
+    } catch (error) {
+      console.log('Error registering custom properties:', error);
+    }
+    
+    // Attach event handlers directly to the model
+    const onAfterRenderQuestion = (_sender: any, options: any) => {
+      const question = options.question;
+      const questionElement = options.htmlElement;
+      
+      // Look for guide and lesson in the original survey data
+      let guide = null;
+      let lesson = null;
+      
+      // Try to find the question in the original data
+      if (surveyJson && surveyJson.pages) {
+        for (const page of surveyJson.pages) {
+          if (page.elements) {
+            const originalQuestion = page.elements.find((q: any) => q.name === question.name);
+            if (originalQuestion) {
+              guide = originalQuestion.guide;
+              lesson = originalQuestion.lesson;
+              break;
+            }
+          }
         }
       }
       
-      // Format 2: "{question1} = true" or "{question1} = false"
-      match = condition.match(/\{([^}]+)\}\s*=\s*(true|false)/);
-      if (match) {
-        const [, questionId, expectedValue] = match;
-        const actualValue = answers[questionId];
-        const expected = expectedValue === 'true';
-        console.log(`Boolean condition: ${questionId} = ${expected}, Actual: ${actualValue}`);
-        return actualValue === expected;
+      console.log('onAfterRenderQuestion called for:', question.name, {
+        hasGuide: !!guide,
+        hasLesson: !!lesson,
+        guide: guide,
+        lesson: lesson,
+        questionProperties: Object.keys(question),
+        originalDataFound: !!(guide || lesson)
+      });
+      
+      // Guide popup button - improved positioning
+      if (guide) {
+        console.log('Adding guide button for question:', question.name);
+        
+        // Try multiple selectors to find the title element
+        const titleSelectors = [
+          '.sv-question__title',
+          '.sv-question__title-text',
+          '.sv-question__title h5',
+          '.sv-question__title h4',
+          '.sv-question__title h3',
+          '.sv-question__title h2',
+          '.sv-question__title h1',
+          '.sv-question__title span',
+          '.sv-question__title div',
+          '.sv-question__title'
+        ];
+        
+        let titleEl = null;
+        let usedSelector = '';
+        
+        for (const selector of titleSelectors) {
+          const element = questionElement.querySelector(selector);
+          if (element) {
+            titleEl = element;
+            usedSelector = selector;
+            break;
+          }
+        }
+        
+        console.log('Title element search:', {
+          found: !!titleEl,
+          usedSelector,
+          questionElementClasses: questionElement.className,
+          questionElementHTML: questionElement.innerHTML.substring(0, 200) + '...'
+        });
+        
+        if (titleEl) {
+          // Remove any existing guide button first
+          const existingBtn = titleEl.querySelector('.guide-button');
+          if (existingBtn) {
+            existingBtn.remove();
+          }
+          
+          const btn = document.createElement('button');
+          btn.className = 'guide-button ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors';
+          btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+          btn.onclick = () => setGuidePopup({ show: true, title: question.title || question.name, content: guide });
+          
+          // Try to insert the button after the title text
+          const titleText = titleEl.querySelector('.sv-question__title-text') || titleEl;
+          if (titleText && titleText.parentNode) {
+            titleText.parentNode.insertBefore(btn, titleText.nextSibling);
+            console.log('Guide button added successfully');
+          } else {
+            // Fallback: append to the title element
+            titleEl.appendChild(btn);
+            console.log('Guide button added successfully (fallback)');
+          }
+        } else {
+          console.log('Could not find title element for question:', question.name);
+          console.log('Available elements in question:', Array.from(questionElement.children).map(child => ({
+            tagName: (child as HTMLElement).tagName,
+            className: (child as HTMLElement).className,
+            textContent: (child as HTMLElement).textContent?.substring(0, 50)
+          })));
+        }
       }
       
-      // Format 3: "{question1} = 1" or "{question1} = 0"
-      match = condition.match(/\{([^}]+)\}\s*=\s*(\d+)/);
-      if (match) {
-        const [, questionId, expectedValue] = match;
-        const actualValue = answers[questionId];
-        const expected = Number(expectedValue);
-        console.log(`Numeric condition: ${questionId} = ${expected}, Actual: ${actualValue}`);
-        return Number(actualValue) === expected;
+      // Lesson hover functionality
+      if (lesson) {
+        console.log('Adding lesson tooltip for question:', question.name);
+        // Add hover tooltip to the entire question
+        (questionElement as HTMLElement).style.position = 'relative';
+        questionElement.setAttribute('data-lesson', lesson);
+        
+        // Create tooltip element
+        const tooltip = document.createElement('div');
+        tooltip.className = 'lesson-tooltip absolute z-10 bg-yellow-100 border border-yellow-300 rounded-md p-3 shadow-lg max-w-xs opacity-0 pointer-events-none transition-opacity duration-200';
+        tooltip.style.top = '-10px';
+        tooltip.style.left = '100%';
+        tooltip.style.marginLeft = '10px';
+        tooltip.innerHTML = `
+          <div class="text-sm">
+            <div class="font-medium text-yellow-800 mb-1">Approfondimento</div>
+            <div class="text-yellow-700">${lesson}</div>
+          </div>
+          <div class="absolute top-2 -left-1 w-2 h-2 bg-yellow-100 border-l border-t border-yellow-300 transform rotate-45"></div>
+        `;
+        
+        questionElement.appendChild(tooltip);
+        
+        // Create event listener functions
+        const handleMouseEnter = () => {
+          tooltip.style.opacity = '1';
+          tooltip.style.pointerEvents = 'auto';
+        };
+        
+        const handleMouseLeave = () => {
+          tooltip.style.opacity = '0';
+          tooltip.style.pointerEvents = 'none';
+        };
+        
+        // Add hover events
+        questionElement.addEventListener('mouseenter', handleMouseEnter);
+        questionElement.addEventListener('mouseleave', handleMouseLeave);
+        
+        console.log('Lesson tooltip added successfully');
+        
+        // Update lesson sidebar for the current question
+        setCurrentLesson(lesson);
+      } else {
+        setCurrentLesson(null);
       }
+    };
+    
+    const onCurrentPageChanged = (sender: any, options: any) => {
+      // Find the first question with a lesson on the new page
+      const page = options.newCurrentPage;
+      const lessonQ = page && page.questions && page.questions.find((q: any) => {
+        // Look for lesson in original data
+        if (surveyJson && surveyJson.pages) {
+          for (const surveyPage of surveyJson.pages) {
+            if (surveyPage.elements) {
+              const originalQuestion = surveyPage.elements.find((oq: any) => oq.name === q.name);
+              if (originalQuestion && originalQuestion.lesson) {
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      });
       
-      // Format 4: "{question1} contains 'value'"
-      match = condition.match(/\{([^}]+)\}\s+contains\s+['"]([^'"]*)['"]/);
-      if (match) {
-        const [, questionId, expectedValue] = match;
-        const actualValue = answers[questionId];
-        console.log(`Contains condition: ${questionId} contains "${expectedValue}", Actual: ${actualValue}`);
-        return Array.isArray(actualValue) ? actualValue.includes(expectedValue) : String(actualValue).includes(expectedValue);
+      let lesson = null;
+      if (lessonQ && surveyJson && surveyJson.pages) {
+        for (const page of surveyJson.pages) {
+          if (page.elements) {
+            const originalQuestion = page.elements.find((q: any) => q.name === lessonQ.name);
+            if (originalQuestion) {
+              lesson = originalQuestion.lesson;
+              break;
+            }
+          }
+        }
       }
-      
-      // Format 5: "{question1} notcontains 'value'"
-      match = condition.match(/\{([^}]+)\}\s+notcontains\s+['"]([^'"]*)['"]/);
-      if (match) {
-        const [, questionId, expectedValue] = match;
-        const actualValue = answers[questionId];
-        console.log(`Not contains condition: ${questionId} notcontains "${expectedValue}", Actual: ${actualValue}`);
-        return Array.isArray(actualValue) ? !actualValue.includes(expectedValue) : !String(actualValue).includes(expectedValue);
-      }
-      
-      console.log('No matching condition format found, defaulting to true');
-      return true;
-    } catch (error) {
-      console.error('Error evaluating condition:', condition, error);
-      return true;
-    }
-  };
-  
-  // Function to filter visible questions based on conditional logic
-  const getVisibleQuestions = (questions: Question[], answers: Record<string, any>): Question[] => {
-    return questions.filter(question => {
-      if (!question.visibleIf) return true;
-      return evaluateCondition(question.visibleIf, answers);
-    });
-  };
-  
-  // Fetch questionnaire data
+      setCurrentLesson(lesson);
+    };
+    
+    const onComplete = (sender: any) => {
+      toast({
+        title: 'Questionario inviato',
+        description: 'Il questionario è stato inviato con successo!',
+      });
+      navigate('/dashboard');
+    };
+    
+    // Attach events to the model
+    model.onAfterRenderQuestion.add(onAfterRenderQuestion);
+    model.onCurrentPageChanged.add(onCurrentPageChanged);
+    model.onComplete.add(onComplete);
+    
+    console.log('SurveyJS events attached successfully to model');
+    
+    return model;
+  }, [surveyJson, navigate, toast]);
+
   useEffect(() => {
     const fetchQuestionnaire = async () => {
       setLoading(true);
@@ -446,228 +310,39 @@ const Questionnaire = () => {
         const res = await fetch(`/api/forms/${id}`);
         if (!res.ok) throw new Error('Questionnaire not found');
         const result = await res.json();
-        
-        console.log('Questionnaire API Response:', result);
-        
-        // Check if the response has the correct structure
-        if (!result.success || !result.data) {
-          throw new Error('Invalid API response structure');
-        }
-        
+        if (!result.success || !result.data) throw new Error('Invalid API response structure');
         const data = result.data;
         
-        // Process the questions from the SurveyJS format
-        let questions = [];
-        if (data.questions && data.questions.pages && data.questions.pages.length > 0) {
-          // Extract questions from SurveyJS format
-          questions = data.questions.pages[0].elements?.map(element => {
-            console.log('Processing element:', element);
-            return {
-              id: element.name,
-              type: element.type,
-              title: element.title || element.name,
-              description: element.description,
-              required: element.isRequired || false,
-              guide: element.guide,
-              lesson: element.lesson,
-              visibleIf: element.visibleIf, // Extract conditional logic
-              options: element.choices?.map((choice, index) => ({
-                id: `option-${index}`,
-                value: choice,
-                label: choice
-              })) || []
-            };
-          }) || [];
+        console.log('Fetched questionnaire data:', data);
+        console.log('Questions structure:', data.questions);
+        console.log('Pages array:', data.questions.pages);
+        if (data.questions.pages && data.questions.pages.length > 0) {
+          console.log('First page:', data.questions.pages[0]);
+          if (data.questions.pages[0].elements) {
+            console.log('First page elements:', data.questions.pages[0].elements);
+            data.questions.pages[0].elements.forEach((element: any, index: number) => {
+              console.log(`Element ${index}:`, element);
+            });
+          }
         }
         
-        console.log('Processed questions:', questions);
-        console.log('Questions with conditional logic:', questions.filter(q => q.visibleIf));
-        questions.filter(q => q.visibleIf).forEach(q => {
-          console.log(`Question "${q.title}" has condition: ${q.visibleIf}`);
-        });
-        
-        setAllQuestions(questions);
-        setVisibleQuestions(questions); // Initially show all questions
-        
-        setQuestionnaire({
-          id: data.id,
-          title: data.title,
-          description: data.description,
-          questions: questions,
-        });
+        setSurveyJson(data.questions || {});
+        setSurveyTitle(data.title || '');
+        setSurveyDescription(data.description || '');
       } catch (error) {
-        console.error('Error fetching questionnaire:', error);
         toast({
           title: 'Errore',
           description: 'Impossibile caricare il questionario',
           variant: 'destructive',
         });
-        setQuestionnaire(null);
       } finally {
         setLoading(false);
       }
     };
-
     if (id) fetchQuestionnaire();
   }, [id, toast]);
 
-  // Update visible questions when answers change
-  useEffect(() => {
-    if (allQuestions.length > 0) {
-      console.log('=== Updating visible questions ===');
-      console.log('All questions:', allQuestions.length);
-      console.log('Current answers:', answers);
-      
-      const visible = getVisibleQuestions(allQuestions, answers);
-      setVisibleQuestions(visible);
-      
-      console.log('Visible questions:', visible.length, 'out of', allQuestions.length);
-      visible.forEach((q, index) => {
-        console.log(`${index + 1}. "${q.title}" (${q.id})`);
-      });
-      
-      const hidden = allQuestions.filter(q => !visible.includes(q));
-      if (hidden.length > 0) {
-        console.log('Hidden questions:');
-        hidden.forEach(q => {
-          console.log(`- "${q.title}" (${q.id}) - Condition: ${q.visibleIf}`);
-        });
-      }
-      
-      // Adjust current question index if it's now invalid
-      if (currentQuestionIndex >= visible.length && visible.length > 0) {
-        console.log('Adjusting current question index from', currentQuestionIndex, 'to', visible.length - 1);
-        setCurrentQuestionIndex(visible.length - 1);
-      }
-      
-      console.log('=== End update ===');
-    }
-  }, [answers, allQuestions, currentQuestionIndex]);
-
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
-
-  const handleNextQuestion = () => {
-    if (visibleQuestions.length > 0) {
-      const currentQuestion = visibleQuestions[currentQuestionIndex];
-      
-      // Check if current question is required and has an answer
-      if (currentQuestion.required && !answers[currentQuestion.id]) {
-        toast({
-          title: 'Risposta richiesta',
-          description: 'Per favore, rispondi alla domanda corrente per continuare.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      if (currentQuestionIndex < visibleQuestions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-      }
-    }
-  };
-
-  const handleAnswerChange = (questionId: string, value: any) => {
-    setAnswers(prev => ({ ...prev, [questionId]: value }));
-  };
-
-  const handleSaveDraft = async () => {
-    setSaving(true);
-    try {
-      // In a real app, you would call your API here
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: 'Salvato in bozza',
-        description: 'Il questionario è stato salvato in bozza e puoi riprenderlo in seguito.',
-      });
-      
-      setSaving(false);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      toast({
-        title: 'Errore',
-        description: 'Si è verificato un errore durante il salvataggio',
-        variant: 'destructive',
-      });
-      setSaving(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    setSaving(true);
-    try {
-      // Validate all required visible questions have answers
-      if (visibleQuestions.length > 0) {
-        const unansweredRequired = visibleQuestions.filter(
-          q => q.required && !answers[q.id]
-        );
-        
-        if (unansweredRequired.length > 0) {
-          toast({
-            title: 'Domande senza risposta',
-            description: `Ci sono ${unansweredRequired.length} domande obbligatorie senza risposta.`,
-            variant: 'destructive',
-          });
-          setSaving(false);
-          return;
-        }
-      }
-      
-      // In a real app, you would submit your answers to the API here
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: 'Questionario inviato',
-        description: 'Il questionario è stato inviato con successo!',
-      });
-      
-      setSaving(false);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error submitting questionnaire:', error);
-      toast({
-        title: 'Errore',
-        description: 'Si è verificato un errore durante l\'invio',
-        variant: 'destructive',
-      });
-      setSaving(false);
-    }
-  };
-
-  // Close popup when clicking outside or pressing escape
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && guidePopup.show) {
-        setGuidePopup({ show: false, title: '', content: '' });
-      }
-    };
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (guidePopup.show && e.target instanceof Element) {
-        const popup = e.target.closest('.guide-popup');
-        const overlay = e.target.closest('.guide-overlay');
-        if (!popup && overlay) {
-          setGuidePopup({ show: false, title: '', content: '' });
-        }
-      }
-    };
-
-    if (guidePopup.show) {
-      document.addEventListener('keydown', handleEscape);
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [guidePopup.show]);
-
+  // Early returns after all hooks are called
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -679,7 +354,7 @@ const Questionnaire = () => {
     );
   }
 
-  if (!questionnaire) {
+  if (!surveyJson || !surveyModel) {
     return (
       <div className="container mx-auto p-6">
         <MainNavigation variant="questionnaire" title="Errore" />
@@ -691,205 +366,100 @@ const Questionnaire = () => {
     );
   }
 
-  // Ensure current question index is valid for visible questions
-  const validCurrentIndex = Math.min(currentQuestionIndex, visibleQuestions.length - 1);
-  const currentQuestion = visibleQuestions[validCurrentIndex];
-  const progress = visibleQuestions.length > 0 ? Math.round(((validCurrentIndex + 1) / visibleQuestions.length) * 100) : 0;
-
-  // Handle case when no questions are visible
-  if (visibleQuestions.length === 0) {
-    return (
-      <div className="container mx-auto p-6">
-        <MainNavigation variant="questionnaire" title={questionnaire.title} />
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Nessuna domanda disponibile</h2>
-            <p className="text-gray-600 mb-6">
-              Non ci sono domande da mostrare in base alle tue risposte precedenti.
-            </p>
-            <Button onClick={() => setSubmitConfirmOpen(true)} disabled={saving}>
-              <Send className="h-4 w-4 mr-1" />
-              Invia Questionario
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Add demo data for future questionnaires
-  const futureQuestionnaires = [
-    {
-      id: 'future-1',
-      title: 'Valutazione Bisogni Formativi',
-      availableDate: '15/06/2025'
-    },
-    {
-      id: 'future-2',
-      title: 'Indagine Soddisfazione Cliente',
-      availableDate: '30/09/2025'
-    }
-  ];
+  // Save as Draft handler
+  const handleSaveDraft = () => {
+    if (!surveyModel) return;
+    const data = surveyModel.data;
+    // TODO: Send to backend
+    toast({
+      title: 'Bozza salvata',
+      description: 'Le risposte sono state salvate in bozza (simulato).',
+    });
+    console.log('Draft data:', data);
+  };
 
   return (
     <div className="container mx-auto">
-      <MainNavigation variant="questionnaire" title={questionnaire.title} />
-      
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">{questionnaire.title}</h1>
-          {questionnaire.description && (
-            <p className="text-gray-600">{questionnaire.description}</p>
-          )}
-          <div className="mt-4">
-            <div className="flex justify-between text-sm mb-1">
-              <span>Domanda {validCurrentIndex + 1} di {visibleQuestions.length}</span>
-              <span>{progress}% completato</span>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2">
-            <div
-              onMouseEnter={() => setShowLesson(true)}
-              onMouseLeave={() => setShowLesson(false)}
-            >
-              <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex flex-col gap-1">
-                    <span className="flex items-center gap-2">
-                      {currentQuestion.title}
-                      {currentQuestion.guide && (
-                        <button
-                          type="button"
-                          onClick={() => setGuidePopup({
-                            show: true,
-                            title: currentQuestion.title,
-                            content: currentQuestion.guide
-                          })}
-                          className="guide-button ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
-                          aria-label={`Show guide for ${currentQuestion.title}`}
-                        >
-                          <HelpCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                    </span>
-                    {currentQuestion.description && (
-                      <span className="text-gray-500 text-sm mt-1">{currentQuestion.description}</span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <QuestionForm
-                    question={currentQuestion}
-                    value={answers[currentQuestion.id] || ''}
-                    onChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                  />
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                                      <Button
-                      variant="outline"
-                      onClick={handlePreviousQuestion}
-                      disabled={validCurrentIndex === 0}
-                    >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Precedente
-                  </Button>
-                  
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="outline"
-                      onClick={() => setDraftConfirmOpen(true)}
-                      className="flex items-center"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Salva in bozza
-                    </Button>
-                    
-                    {validCurrentIndex < visibleQuestions.length - 1 ? (
-                      <Button onClick={handleNextQuestion}>
-                        Successiva
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={() => setSubmitConfirmOpen(true)} 
-                        disabled={saving}
-                      >
-                        <Send className="h-4 w-4 mr-1" />
-                        Invia
-                      </Button>
-                    )}
-                  </div>
-                </CardFooter>
-              </Card>
-            </div>
-          </div>
+      <style>
+        {`
+          .lesson-tooltip {
+            position: absolute !important;
+            z-index: 1000 !important;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+          }
           
-          <div className="md:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Informazioni Domanda</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Guide box removed from sidebar - now shown as popup */}
-
-                {/* LESSON/APPROFONDIMENTO: show only on hover */}
-                {currentQuestion.lesson && showLesson && (
-                  <div className="bg-yellow-50 p-4 rounded-md min-h-[80px] flex flex-col justify-start items-center">
-                    <span className="font-medium mb-2">Approfondimento</span>
-                    <div className="mt-2 w-full">
-                      <p className="text-sm text-yellow-800 text-center">{currentQuestion.lesson}</p>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="space-y-3 mt-6">
-                  <h3 className="font-medium">Questionari Futuri</h3>
-                  {futureQuestionnaires.map((q, idx) => (
-                    <div key={q.id} className="p-3 border rounded-md">
-                      <p className="font-medium">{q.title}</p>
-                      <p className="text-xs text-gray-500">Disponibile dal: {q.availableDate}</p>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Debug Panel - Remove in production */}
-                <div className="space-y-3 mt-6 p-3 bg-gray-100 rounded-md">
-                  <h3 className="font-medium text-sm">Debug Info</h3>
-                  <div className="text-xs space-y-1">
-                    <p>Total Questions: {allQuestions.length}</p>
-                    <p>Visible Questions: {visibleQuestions.length}</p>
-                    <p>Current Index: {currentQuestionIndex}</p>
-                    <p>Current Question: {currentQuestion?.title}</p>
-                    <p>Answers: {Object.keys(answers).length}</p>
-                    {currentQuestion?.visibleIf && (
-                      <p className="text-red-600">Condition: {currentQuestion.visibleIf}</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          .lesson-tooltip:hover {
+            pointer-events: auto;
+          }
+          
+          .guide-button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin-left: 0.5rem !important;
+            width: 1.5rem !important;
+            height: 1.5rem !important;
+            border-radius: 9999px !important;
+            background-color: rgb(243 232 255) !important;
+            color: rgb(147 51 234) !important;
+            transition: background-color 0.2s ease !important;
+          }
+          
+          .guide-button:hover {
+            background-color: rgb(233 213 255) !important;
+          }
+          
+          .sv-question {
+            position: relative !important;
+          }
+        `}
+      </style>
+      <MainNavigation variant="questionnaire" title={surveyTitle} />
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">{surveyTitle}</h1>
+        {surveyDescription && <p className="text-gray-600 mb-6">{surveyDescription}</p>}
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="flex-1 bg-white rounded-lg shadow-lg p-8">
+            {surveyModel ? (
+              <Survey ref={surveyRef} model={surveyModel} />
+            ) : (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            )}
+            <div className="mt-6 flex justify-end">
+              <Button variant="outline" onClick={handleSaveDraft}>
+                Salva in bozza
+              </Button>
+            </div>
           </div>
+          {/* Lesson Sidebar (desktop) */}
+          {isDesktop && (
+            <div className="w-full lg:w-80">
+              {currentLesson && (
+                <div className="bg-yellow-50 p-4 rounded-md min-h-[80px] flex flex-col justify-start items-center shadow">
+                  <span className="font-medium mb-2">Approfondimento</span>
+                  <div className="mt-2 w-full">
+                    <p className="text-sm text-yellow-800 text-center">{currentLesson}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+        {/* Lesson below on mobile */}
+        {!isDesktop && currentLesson && (
+          <div className="mt-6">
+            <div className="bg-yellow-50 p-4 rounded-md min-h-[80px] flex flex-col justify-start items-center shadow">
+              <span className="font-medium mb-2">Approfondimento</span>
+              <div className="mt-2 w-full">
+                <p className="text-sm text-yellow-800 text-center">{currentLesson}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      
-      <QuestionSaveConfirmation
-        mode="draft"
-        open={draftConfirmOpen}
-        onOpenChange={setDraftConfirmOpen}
-        onConfirm={handleSaveDraft}
-      />
-      
-      <QuestionSaveConfirmation
-        mode="submit"
-        open={submitConfirmOpen}
-        onOpenChange={setSubmitConfirmOpen}
-        onConfirm={handleSubmit}
-      />
-
       {/* Guide Popup */}
       {guidePopup.show && (
         <div 
