@@ -758,21 +758,26 @@ const Questionnaire = () => {
             >
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2">
-                    {currentQuestion.title}
-                    {currentQuestion.guide && (
-                      <button
-                        type="button"
-                        onClick={() => setGuidePopup({
-                          show: true,
-                          title: currentQuestion.title,
-                          content: currentQuestion.guide
-                        })}
-                        className="guide-button ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
-                        aria-label={`Show guide for ${currentQuestion.title}`}
-                      >
-                        <HelpCircle className="w-4 h-4" />
-                      </button>
+                  <CardTitle className="flex flex-col gap-1">
+                    <span className="flex items-center gap-2">
+                      {currentQuestion.title}
+                      {currentQuestion.guide && (
+                        <button
+                          type="button"
+                          onClick={() => setGuidePopup({
+                            show: true,
+                            title: currentQuestion.title,
+                            content: currentQuestion.guide
+                          })}
+                          className="guide-button ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
+                          aria-label={`Show guide for ${currentQuestion.title}`}
+                        >
+                          <HelpCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </span>
+                    {currentQuestion.description && (
+                      <span className="text-gray-500 text-sm mt-1">{currentQuestion.description}</span>
                     )}
                   </CardTitle>
                 </CardHeader>

@@ -75,6 +75,17 @@ export default function FormBuilderEditor() {
         default: false,
       });
     }
+
+    // Add 'description' property to all questions if not already present
+    if (!Serializer.findProperty('question', 'description')) {
+      Serializer.addProperty('question', {
+        name: 'description:text',
+        displayName: 'Description',
+        category: 'General',
+        visibleIndex: 2, // Show after title
+        isRequired: false,
+      });
+    }
   }, []);
 
   if (!creatorRef.current) {
