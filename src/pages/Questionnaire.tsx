@@ -28,6 +28,8 @@ interface Question {
   rows?: Array<{ label: string; value: string }>;
   multiple?: boolean;
   accept?: string;
+  visible?: boolean;
+  visibleIf?: string;
 }
 
 interface QuestionnaireData {
@@ -205,57 +207,40 @@ const QuestionForm = ({ question, value, onChange }) => {
     case 'boolean':
     case 'yesno':
       return (
-        <div className="space-y-3 mt-4">
+        <div className="flex items-center gap-4 mt-4">
           <div
-            className={`p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-              value === true
-                ? 'border-purple-600 bg-purple-50'
-                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-            }`}
-            onClick={() => onChange(true)}
+            className={
+              `relative flex items-center w-28 h-12 rounded-full transition-colors duration-200 cursor-pointer ` +
+              (value === true ? 'bg-purple-600' : 'bg-gray-200')
+            }
+            onClick={() => onChange(!value)}
+            style={{ minWidth: 112 }}
           >
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id={`${question.id}-yes`}
-                name={`question-${question.id}`}
-                checked={value === true}
-                onChange={() => onChange(true)}
-                className="mr-3 text-purple-600"
-              />
-              <label
-                htmlFor={`${question.id}-yes`}
-                className="cursor-pointer w-full text-gray-700 font-medium"
-              >
-                Sì
-              </label>
-            </div>
-          </div>
-          
-          <div
-            className={`p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-              value === false
-                ? 'border-purple-600 bg-purple-50'
-                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-            }`}
-            onClick={() => onChange(false)}
-          >
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id={`${question.id}-no`}
-                name={`question-${question.id}`}
-                checked={value === false}
-                onChange={() => onChange(false)}
-                className="mr-3 text-purple-600"
-              />
-              <label
-                htmlFor={`${question.id}-no`}
-                className="cursor-pointer w-full text-gray-700 font-medium"
-              >
-                No
-              </label>
-            </div>
+            {/* No Label */}
+            <span
+              className={
+                'flex-1 text-center z-10 font-medium ' +
+                (value === false ? 'text-purple-600' : 'text-gray-500')
+              }
+            >
+              No
+            </span>
+            {/* Yes Label */}
+            <span
+              className={
+                'flex-1 text-center z-10 font-medium ' +
+                (value === true ? 'text-purple-600' : 'text-gray-500')
+              }
+            >
+              Yes
+            </span>
+            {/* Slider */}
+            <span
+              className="absolute top-1 left-1 w-12 h-10 bg-white rounded-full shadow transition-transform duration-200"
+              style={{
+                transform: value === true ? 'translateX(48px)' : 'translateX(0)'
+              }}
+            ></span>
           </div>
         </div>
       );
@@ -352,6 +337,8 @@ const Questionnaire = () => {
   const [questionnaire, setQuestionnaire] = useState<QuestionnaireData | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  const [visibleQuestions, setVisibleQuestions] = useState<Question[]>([]);
   const [guidePopup, setGuidePopup] = useState<{ show: boolean; title: string; content: string }>({
     show: false,
     title: '',
@@ -361,6 +348,95 @@ const Questionnaire = () => {
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [upcomingQuestionnaires, setUpcomingQuestionnaires] = useState<any[]>([]);
   const [showLesson, setShowLesson] = useState(false);
+  
+  // Function to evaluate conditional logic
+  const evaluateCondition = (condition: string, answers: Record<string, any>): boolean => {
+    if (!condition) return true;
+    
+    console.log('Evaluating condition:', condition);
+    console.log('Current answers:', answers);
+    
+    try {
+      // Handle different SurveyJS conditional formats
+      
+      // Format 1: "{question1} = 'Yes'"
+      let match = condition.match(/\{([^}]+)\}\s*([=!<>]+)\s*['"]([^'"]*)['"]/);
+      if (match) {
+        const [, questionId, operator, expectedValue] = match;
+        const actualValue = answers[questionId];
+        console.log(`Condition: ${questionId} ${operator} "${expectedValue}", Actual: ${actualValue}`);
+        
+        switch (operator) {
+          case '=':
+            return actualValue === expectedValue;
+          case '!=':
+            return actualValue !== expectedValue;
+          case '>':
+            return Number(actualValue) > Number(expectedValue);
+          case '<':
+            return Number(actualValue) < Number(expectedValue);
+          case '>=':
+            return Number(actualValue) >= Number(expectedValue);
+          case '<=':
+            return Number(actualValue) <= Number(expectedValue);
+          default:
+            return true;
+        }
+      }
+      
+      // Format 2: "{question1} = true" or "{question1} = false"
+      match = condition.match(/\{([^}]+)\}\s*=\s*(true|false)/);
+      if (match) {
+        const [, questionId, expectedValue] = match;
+        const actualValue = answers[questionId];
+        const expected = expectedValue === 'true';
+        console.log(`Boolean condition: ${questionId} = ${expected}, Actual: ${actualValue}`);
+        return actualValue === expected;
+      }
+      
+      // Format 3: "{question1} = 1" or "{question1} = 0"
+      match = condition.match(/\{([^}]+)\}\s*=\s*(\d+)/);
+      if (match) {
+        const [, questionId, expectedValue] = match;
+        const actualValue = answers[questionId];
+        const expected = Number(expectedValue);
+        console.log(`Numeric condition: ${questionId} = ${expected}, Actual: ${actualValue}`);
+        return Number(actualValue) === expected;
+      }
+      
+      // Format 4: "{question1} contains 'value'"
+      match = condition.match(/\{([^}]+)\}\s+contains\s+['"]([^'"]*)['"]/);
+      if (match) {
+        const [, questionId, expectedValue] = match;
+        const actualValue = answers[questionId];
+        console.log(`Contains condition: ${questionId} contains "${expectedValue}", Actual: ${actualValue}`);
+        return Array.isArray(actualValue) ? actualValue.includes(expectedValue) : String(actualValue).includes(expectedValue);
+      }
+      
+      // Format 5: "{question1} notcontains 'value'"
+      match = condition.match(/\{([^}]+)\}\s+notcontains\s+['"]([^'"]*)['"]/);
+      if (match) {
+        const [, questionId, expectedValue] = match;
+        const actualValue = answers[questionId];
+        console.log(`Not contains condition: ${questionId} notcontains "${expectedValue}", Actual: ${actualValue}`);
+        return Array.isArray(actualValue) ? !actualValue.includes(expectedValue) : !String(actualValue).includes(expectedValue);
+      }
+      
+      console.log('No matching condition format found, defaulting to true');
+      return true;
+    } catch (error) {
+      console.error('Error evaluating condition:', condition, error);
+      return true;
+    }
+  };
+  
+  // Function to filter visible questions based on conditional logic
+  const getVisibleQuestions = (questions: Question[], answers: Record<string, any>): Question[] => {
+    return questions.filter(question => {
+      if (!question.visibleIf) return true;
+      return evaluateCondition(question.visibleIf, answers);
+    });
+  };
   
   // Fetch questionnaire data
   useEffect(() => {
@@ -384,23 +460,34 @@ const Questionnaire = () => {
         let questions = [];
         if (data.questions && data.questions.pages && data.questions.pages.length > 0) {
           // Extract questions from SurveyJS format
-          questions = data.questions.pages[0].elements?.map(element => ({
-            id: element.name,
-            type: element.type,
-            title: element.title || element.name,
-            description: element.description,
-            required: element.isRequired || false,
-            guide: element.guide,
-            lesson: element.lesson,
-            options: element.choices?.map((choice, index) => ({
-              id: `option-${index}`,
-              value: choice,
-              label: choice
-            })) || []
-          })) || [];
+          questions = data.questions.pages[0].elements?.map(element => {
+            console.log('Processing element:', element);
+            return {
+              id: element.name,
+              type: element.type,
+              title: element.title || element.name,
+              description: element.description,
+              required: element.isRequired || false,
+              guide: element.guide,
+              lesson: element.lesson,
+              visibleIf: element.visibleIf, // Extract conditional logic
+              options: element.choices?.map((choice, index) => ({
+                id: `option-${index}`,
+                value: choice,
+                label: choice
+              })) || []
+            };
+          }) || [];
         }
         
         console.log('Processed questions:', questions);
+        console.log('Questions with conditional logic:', questions.filter(q => q.visibleIf));
+        questions.filter(q => q.visibleIf).forEach(q => {
+          console.log(`Question "${q.title}" has condition: ${q.visibleIf}`);
+        });
+        
+        setAllQuestions(questions);
+        setVisibleQuestions(questions); // Initially show all questions
         
         setQuestionnaire({
           id: data.id,
@@ -424,6 +511,39 @@ const Questionnaire = () => {
     if (id) fetchQuestionnaire();
   }, [id, toast]);
 
+  // Update visible questions when answers change
+  useEffect(() => {
+    if (allQuestions.length > 0) {
+      console.log('=== Updating visible questions ===');
+      console.log('All questions:', allQuestions.length);
+      console.log('Current answers:', answers);
+      
+      const visible = getVisibleQuestions(allQuestions, answers);
+      setVisibleQuestions(visible);
+      
+      console.log('Visible questions:', visible.length, 'out of', allQuestions.length);
+      visible.forEach((q, index) => {
+        console.log(`${index + 1}. "${q.title}" (${q.id})`);
+      });
+      
+      const hidden = allQuestions.filter(q => !visible.includes(q));
+      if (hidden.length > 0) {
+        console.log('Hidden questions:');
+        hidden.forEach(q => {
+          console.log(`- "${q.title}" (${q.id}) - Condition: ${q.visibleIf}`);
+        });
+      }
+      
+      // Adjust current question index if it's now invalid
+      if (currentQuestionIndex >= visible.length && visible.length > 0) {
+        console.log('Adjusting current question index from', currentQuestionIndex, 'to', visible.length - 1);
+        setCurrentQuestionIndex(visible.length - 1);
+      }
+      
+      console.log('=== End update ===');
+    }
+  }, [answers, allQuestions, currentQuestionIndex]);
+
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
@@ -431,8 +551,8 @@ const Questionnaire = () => {
   };
 
   const handleNextQuestion = () => {
-    if (questionnaire) {
-      const currentQuestion = questionnaire.questions[currentQuestionIndex];
+    if (visibleQuestions.length > 0) {
+      const currentQuestion = visibleQuestions[currentQuestionIndex];
       
       // Check if current question is required and has an answer
       if (currentQuestion.required && !answers[currentQuestion.id]) {
@@ -444,7 +564,7 @@ const Questionnaire = () => {
         return;
       }
       
-      if (currentQuestionIndex < questionnaire.questions.length - 1) {
+      if (currentQuestionIndex < visibleQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     }
@@ -481,9 +601,9 @@ const Questionnaire = () => {
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      // Validate all required questions have answers
-      if (questionnaire) {
-        const unansweredRequired = questionnaire.questions.filter(
+      // Validate all required visible questions have answers
+      if (visibleQuestions.length > 0) {
+        const unansweredRequired = visibleQuestions.filter(
           q => q.required && !answers[q.id]
         );
         
@@ -571,8 +691,31 @@ const Questionnaire = () => {
     );
   }
 
-  const currentQuestion = questionnaire.questions[currentQuestionIndex];
-  const progress = Math.round(((currentQuestionIndex + 1) / questionnaire.questions.length) * 100);
+  // Ensure current question index is valid for visible questions
+  const validCurrentIndex = Math.min(currentQuestionIndex, visibleQuestions.length - 1);
+  const currentQuestion = visibleQuestions[validCurrentIndex];
+  const progress = visibleQuestions.length > 0 ? Math.round(((validCurrentIndex + 1) / visibleQuestions.length) * 100) : 0;
+
+  // Handle case when no questions are visible
+  if (visibleQuestions.length === 0) {
+    return (
+      <div className="container mx-auto p-6">
+        <MainNavigation variant="questionnaire" title={questionnaire.title} />
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold mb-4">Nessuna domanda disponibile</h2>
+            <p className="text-gray-600 mb-6">
+              Non ci sono domande da mostrare in base alle tue risposte precedenti.
+            </p>
+            <Button onClick={() => setSubmitConfirmOpen(true)} disabled={saving}>
+              <Send className="h-4 w-4 mr-1" />
+              Invia Questionario
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Add demo data for future questionnaires
   const futureQuestionnaires = [
@@ -600,7 +743,7 @@ const Questionnaire = () => {
           )}
           <div className="mt-4">
             <div className="flex justify-between text-sm mb-1">
-              <span>Domanda {currentQuestionIndex + 1} di {questionnaire.questions.length}</span>
+              <span>Domanda {validCurrentIndex + 1} di {visibleQuestions.length}</span>
               <span>{progress}% completato</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -641,11 +784,11 @@ const Questionnaire = () => {
                   />
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={handlePreviousQuestion}
-                    disabled={currentQuestionIndex === 0}
-                  >
+                                      <Button
+                      variant="outline"
+                      onClick={handlePreviousQuestion}
+                      disabled={validCurrentIndex === 0}
+                    >
                     <ChevronLeft className="h-4 w-4 mr-1" />
                     Precedente
                   </Button>
@@ -660,7 +803,7 @@ const Questionnaire = () => {
                       Salva in bozza
                     </Button>
                     
-                    {currentQuestionIndex < questionnaire.questions.length - 1 ? (
+                    {validCurrentIndex < visibleQuestions.length - 1 ? (
                       <Button onClick={handleNextQuestion}>
                         Successiva
                         <ChevronRight className="h-4 w-4 ml-1" />
@@ -706,6 +849,21 @@ const Questionnaire = () => {
                       <p className="text-xs text-gray-500">Disponibile dal: {q.availableDate}</p>
                     </div>
                   ))}
+                </div>
+                
+                {/* Debug Panel - Remove in production */}
+                <div className="space-y-3 mt-6 p-3 bg-gray-100 rounded-md">
+                  <h3 className="font-medium text-sm">Debug Info</h3>
+                  <div className="text-xs space-y-1">
+                    <p>Total Questions: {allQuestions.length}</p>
+                    <p>Visible Questions: {visibleQuestions.length}</p>
+                    <p>Current Index: {currentQuestionIndex}</p>
+                    <p>Current Question: {currentQuestion?.title}</p>
+                    <p>Answers: {Object.keys(answers).length}</p>
+                    {currentQuestion?.visibleIf && (
+                      <p className="text-red-600">Condition: {currentQuestion.visibleIf}</p>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
