@@ -99,7 +99,8 @@ export default function FormBuilderEditor() {
   // Load existing form if editing
   useEffect(() => {
     const loadForm = async () => {
-      if (id && id !== 'new') {
+      // Only try to load if we have a valid numeric ID (not 'new' or undefined)
+      if (id && id !== 'new' && !isNaN(Number(id))) {
         try {
           setLoading(true);
           const response = await fetch(`/api/forms/${id}`);
@@ -127,6 +128,7 @@ export default function FormBuilderEditor() {
           setLoading(false);
         }
       } else {
+        // For new forms, just set loading to false without trying to fetch
         setLoading(false);
       }
     };
@@ -144,7 +146,7 @@ export default function FormBuilderEditor() {
       
       const surveyJSON = creator.JSON;
       const formData = {
-        id: id && id !== 'new' ? id : undefined,
+        id: id && id !== 'new' && !isNaN(Number(id)) ? id : undefined,
         title: creator.survey.title || 'Untitled Form',
         description: creator.survey.description || '',
         surveyJSON: surveyJSON,
@@ -169,8 +171,11 @@ export default function FormBuilderEditor() {
         });
         
         // If this was a new form, navigate to the edit URL
-        if (!id || id === 'new') {
-          navigate(`/admin/form-builder/edit/${result.id}`);
+        if (!id || id === 'new' || isNaN(Number(id))) {
+          // Small delay to ensure the state is properly updated
+          setTimeout(() => {
+            navigate(`/admin/form-builder/edit/${result.id}`);
+          }, 100);
         }
       } else {
         throw new Error(result.message);
@@ -197,7 +202,7 @@ export default function FormBuilderEditor() {
       
       const surveyJSON = creator.JSON;
       const formData = {
-        id: id && id !== 'new' ? id : undefined,
+        id: id && id !== 'new' && !isNaN(Number(id)) ? id : undefined,
         title: creator.survey.title || 'Untitled Form',
         description: creator.survey.description || '',
         surveyJSON: surveyJSON,
@@ -222,8 +227,11 @@ export default function FormBuilderEditor() {
         });
         
         // If this was a new form, navigate to the edit URL
-        if (!id || id === 'new') {
-          navigate(`/admin/form-builder/edit/${result.id}`);
+        if (!id || id === 'new' || isNaN(Number(id))) {
+          // Small delay to ensure the state is properly updated
+          setTimeout(() => {
+            navigate(`/admin/form-builder/edit/${result.id}`);
+          }, 100);
         }
       } else {
         throw new Error(result.message);
@@ -252,7 +260,7 @@ export default function FormBuilderEditor() {
     <div style={{ height: '100vh' }}>
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">
-          {id && id !== 'new' ? 'Modifica Form' : 'Nuovo Form'} (SurveyJS)
+          {id && id !== 'new' && !isNaN(Number(id)) ? 'Modifica Form' : 'Nuovo Form'} (SurveyJS)
         </h1>
         <div className="flex gap-2">
           <Button onClick={handleSave} disabled={saving}>

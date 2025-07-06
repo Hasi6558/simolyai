@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { ChevronLeft, ChevronRight, Save, Send, HelpCircle, Star, UploadCloud } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, Send, HelpCircle, Star, UploadCloud, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import MainNavigation from '@/components/MainNavigation';
 import QuestionSaveConfirmation from '@/components/questionSaveConfirmation';
@@ -202,6 +202,63 @@ const QuestionForm = ({ question, value, onChange }) => {
           />
         </div>
       );
+    case 'boolean':
+    case 'yesno':
+      return (
+        <div className="space-y-3 mt-4">
+          <div
+            className={`p-4 border-2 rounded-xl cursor-pointer transition-colors ${
+              value === true
+                ? 'border-purple-600 bg-purple-50'
+                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+            }`}
+            onClick={() => onChange(true)}
+          >
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id={`${question.id}-yes`}
+                name={`question-${question.id}`}
+                checked={value === true}
+                onChange={() => onChange(true)}
+                className="mr-3 text-purple-600"
+              />
+              <label
+                htmlFor={`${question.id}-yes`}
+                className="cursor-pointer w-full text-gray-700 font-medium"
+              >
+                Sì
+              </label>
+            </div>
+          </div>
+          
+          <div
+            className={`p-4 border-2 rounded-xl cursor-pointer transition-colors ${
+              value === false
+                ? 'border-purple-600 bg-purple-50'
+                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+            }`}
+            onClick={() => onChange(false)}
+          >
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id={`${question.id}-no`}
+                name={`question-${question.id}`}
+                checked={value === false}
+                onChange={() => onChange(false)}
+                className="mr-3 text-purple-600"
+              />
+              <label
+                htmlFor={`${question.id}-no`}
+                className="cursor-pointer w-full text-gray-700 font-medium"
+              >
+                No
+              </label>
+            </div>
+          </div>
+        </div>
+      );
     case 'table':
       // Table with checkboxes or inputs per cell
       return (
@@ -295,7 +352,11 @@ const Questionnaire = () => {
   const [questionnaire, setQuestionnaire] = useState<QuestionnaireData | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [showGuide, setShowGuide] = useState<string | null>(null);
+  const [guidePopup, setGuidePopup] = useState<{ show: boolean; title: string; content: string }>({
+    show: false,
+    title: '',
+    content: ''
+  });
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [upcomingQuestionnaires, setUpcomingQuestionnaires] = useState<any[]>([]);
@@ -366,7 +427,6 @@ const Questionnaire = () => {
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
-      setShowGuide(null);
     }
   };
 
@@ -386,7 +446,6 @@ const Questionnaire = () => {
       
       if (currentQuestionIndex < questionnaire.questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
-        setShowGuide(null);
       }
     }
   };
@@ -460,13 +519,34 @@ const Questionnaire = () => {
     }
   };
 
-  const toggleGuide = (questionId: string) => {
-    if (showGuide === questionId) {
-      setShowGuide(null);
-    } else {
-      setShowGuide(questionId);
+  // Close popup when clicking outside or pressing escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && guidePopup.show) {
+        setGuidePopup({ show: false, title: '', content: '' });
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (guidePopup.show && e.target instanceof Element) {
+        const popup = e.target.closest('.guide-popup');
+        const overlay = e.target.closest('.guide-overlay');
+        if (!popup && overlay) {
+          setGuidePopup({ show: false, title: '', content: '' });
+        }
+      }
+    };
+
+    if (guidePopup.show) {
+      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('mousedown', handleClickOutside);
     }
-  };
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [guidePopup.show]);
 
   if (loading) {
     return (
@@ -535,7 +615,23 @@ const Questionnaire = () => {
             >
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardTitle>{currentQuestion.title}</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    {currentQuestion.title}
+                    {currentQuestion.guide && (
+                      <button
+                        type="button"
+                        onClick={() => setGuidePopup({
+                          show: true,
+                          title: currentQuestion.title,
+                          content: currentQuestion.guide
+                        })}
+                        className="guide-button ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
+                        aria-label={`Show guide for ${currentQuestion.title}`}
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <QuestionForm
@@ -590,26 +686,7 @@ const Questionnaire = () => {
                 <CardTitle className="text-xl">Informazioni Domanda</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {currentQuestion.guide && (
-                  <div className="bg-blue-50 p-4 rounded-md min-h-[80px] flex flex-col justify-start items-center">
-                    <span className="font-medium mb-2">Guida</span>
-                    {showGuide !== currentQuestion.id && (
-                      <button
-                        type="button"
-                        className="flex items-center justify-center rounded-full border border-blue-300 bg-white text-purple-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-purple-400 mb-2"
-                        style={{ width: 40, height: 40 }}
-                        onClick={() => setShowGuide(currentQuestion.id)}
-                      >
-                        <HelpCircle className="h-7 w-7" color="#7c3aed" />
-                      </button>
-                    )}
-                    {showGuide === currentQuestion.id && (
-                      <div className="mt-2 w-full">
-                        <p className="text-sm text-blue-800 text-center">{currentQuestion.guide}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Guide box removed from sidebar - now shown as popup */}
 
                 {/* LESSON/APPROFONDIMENTO: show only on hover */}
                 {currentQuestion.lesson && showLesson && (
@@ -649,6 +726,35 @@ const Questionnaire = () => {
         onOpenChange={setSubmitConfirmOpen}
         onConfirm={handleSubmit}
       />
+
+      {/* Guide Popup */}
+      {guidePopup.show && (
+        <div 
+          className="guide-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="guide-title"
+        >
+          <div className="guide-popup bg-white rounded-lg shadow-xl max-w-md w-full max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 id="guide-title" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-purple-600" />
+                Guide: {guidePopup.title}
+              </h3>
+              <button
+                onClick={() => setGuidePopup({ show: false, title: '', content: '' })}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close guide"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 leading-relaxed">{guidePopup.content}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

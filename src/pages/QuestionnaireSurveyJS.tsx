@@ -2,14 +2,95 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Model } from 'survey-core';
 import { Survey } from 'survey-react-ui';
-import { HelpCircle, BookOpen, Image as ImageIcon, Star } from 'lucide-react';
+import { HelpCircle, BookOpen, Image as ImageIcon, Star, X } from 'lucide-react';
 import 'survey-core/survey-core.css';
+
+// Custom styles for guide button
+const guideButtonStyles = `
+  .guide-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #dbeafe;
+    color: #2563eb;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+    flex-shrink: 0;
+  }
+  
+  .guide-button:hover {
+    background-color: #bfdbfe;
+    transform: scale(1.05);
+  }
+  
+  .guide-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+  
+  .guide-button svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
 
 export default function QuestionnaireSurveyJS() {
   const { id } = useParams();
   const [survey, setSurvey] = useState<Model | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [guidePopup, setGuidePopup] = useState<{ show: boolean; title: string; content: string }>({
+    show: false,
+    title: '',
+    content: ''
+  });
+
+  // Close popup when clicking outside or pressing escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && guidePopup.show) {
+        setGuidePopup({ show: false, title: '', content: '' });
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (guidePopup.show && e.target instanceof Element) {
+        const popup = e.target.closest('.guide-popup');
+        const overlay = e.target.closest('.guide-overlay');
+        if (!popup && overlay) {
+          setGuidePopup({ show: false, title: '', content: '' });
+        }
+      }
+    };
+
+    if (guidePopup.show) {
+      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [guidePopup.show]);
+
+  // Inject custom styles once
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const existingStyle = document.getElementById('guide-button-styles');
+      if (!existingStyle) {
+        const styleElement = document.createElement('style');
+        styleElement.id = 'guide-button-styles';
+        styleElement.textContent = guideButtonStyles;
+        document.head.appendChild(styleElement);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const loadForm = async () => {
@@ -76,21 +157,33 @@ export default function QuestionnaireSurveyJS() {
           
           let hasCustomProps = false;
 
-          // Add guide if present
+          // Add guide button next to question title if guide is present
           if (guideText) {
-            hasCustomProps = true;
-            const guideDiv = document.createElement('div');
-            guideDiv.className = 'guide-container mb-3';
-            guideDiv.innerHTML = `
-              <div class="flex items-center gap-2 text-blue-600 mb-2">
+            // Find the question title element and add the guide button
+            const titleElement = questionElement.querySelector('.sv-question__title');
+            if (titleElement) {
+              // Create guide button
+              const guideButton = document.createElement('button');
+              guideButton.className = 'guide-button';
+              guideButton.setAttribute('aria-label', `Show guide for ${question.title || question.name || 'question'}`);
+              guideButton.innerHTML = `
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span class="font-medium text-sm">Guide</span>
-              </div>
-              <p class="text-sm text-gray-700">${guideText}</p>
-            `;
-            customPropsContainer.appendChild(guideDiv);
+              `;
+              
+              // Add click event to show guide popup
+              guideButton.addEventListener('click', () => {
+                setGuidePopup({
+                  show: true,
+                  title: question.title || question.name || 'Question',
+                  content: guideText
+                });
+              });
+              
+              // Insert the button after the title
+              titleElement.appendChild(guideButton);
+            }
           }
 
           // Add lesson if present (using test data for demonstration)
@@ -253,6 +346,35 @@ export default function QuestionnaireSurveyJS() {
           </div>
         </div>
       </div>
+
+      {/* Guide Popup */}
+      {guidePopup.show && (
+        <div 
+          className="guide-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="guide-title"
+        >
+          <div className="guide-popup bg-white rounded-lg shadow-xl max-w-md w-full max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 id="guide-title" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-blue-600" />
+                Guide: {guidePopup.title}
+              </h3>
+              <button
+                onClick={() => setGuidePopup({ show: false, title: '', content: '' })}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close guide"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 leading-relaxed">{guidePopup.content}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

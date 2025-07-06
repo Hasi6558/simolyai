@@ -67,7 +67,7 @@ const FormBuilder = () => {
     });
 
   const handleCreateNew = () => {
-    navigate('/admin/form-builder/create');
+    navigate('/admin/form-builder/edit/new');
   };
 
   const handleEdit = (formId: string) => {
